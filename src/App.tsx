@@ -60,7 +60,9 @@ export default function App() {
     return t === "drives" || t === "birds" || t === "about" ? t : "explore";
   });
   const [source, setSource] = useState<Source>("sim");
-  const [follow, setFollow] = useState(true);
+  // Start with the camera NOT chasing the demo dot, so the map is immediately
+  // draggable on open. Following turns on when you drive (or tap ◎ Recentre).
+  const [follow, setFollow] = useState(false);
 
   // Simulation state.
   const [simPath, setSimPath] = useState<LatLng[]>(patrolPath);
