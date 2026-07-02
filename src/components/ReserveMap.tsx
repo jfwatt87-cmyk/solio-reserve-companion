@@ -39,6 +39,8 @@ interface Props {
   onSelectPoi: (p: Poi) => void;
   onSelectSighting: (id: string) => void;
   onUserPan: () => void;
+  /** Fired once the map is fully rendered (style + first tiles) and interactive. */
+  onLoaded?: () => void;
 }
 
 interface LayerState {
@@ -229,6 +231,9 @@ export function ReserveMap(props: Props) {
       }
 
       setReady(true);
+      // Signal "fully ready" only once the first frame + tiles have rendered, so
+      // the app reveals an already-interactive map (no dead first second).
+      map.once("idle", () => propsRef.current.onLoaded?.());
     });
 
     return () => {

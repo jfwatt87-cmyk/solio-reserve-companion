@@ -108,6 +108,32 @@ body {
   flex-direction: column;
 }
 
+/* ------------------------------------------------------- Loading splash */
+.app-splash {
+  position: absolute; inset: 0; z-index: 60;
+  background: var(--green);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  transition: opacity 0.45s ease;
+}
+.app-splash.done { opacity: 0; pointer-events: none; }
+.splash-logo {
+  width: 92px; height: auto;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+  animation: splash-pulse 1.7s ease-in-out infinite;
+}
+.splash-title { color: var(--bone); font-family: var(--display); font-size: 21px; letter-spacing: 0.4px; }
+.splash-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid rgba(244, 239, 230, 0.22); border-top-color: var(--ochre);
+  animation: splash-spin 0.9s linear infinite; margin-top: 4px;
+}
+.splash-note { color: rgba(244, 239, 230, 0.6); font-size: 12.5px; letter-spacing: 0.3px; }
+@keyframes splash-spin { to { transform: rotate(360deg); } }
+@keyframes splash-pulse { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.06); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo, .splash-spinner { animation: none; }
+}
+
 /* ---------------------------------------------------------------- Topbar */
 .topbar {
   flex: 0 0 auto;

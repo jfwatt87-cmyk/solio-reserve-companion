@@ -96,6 +96,7 @@ export default function App() {
   const detouring = useRef(false);   // sim is off-route (demo detour) — pause the on-rail pose
   const lastReroute = useRef(0);     // debounce live re-routing
   const [mapFull, setMapFull] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false); // gate the splash until the map is interactive
   const panelBodyRef = useRef<HTMLDivElement>(null);
 
   // Live position + heading (from sim or device GPS).
@@ -118,6 +119,13 @@ export default function App() {
   );
   const [toast, setToast] = useState<string | null>(null);
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+
+  // Failsafe: never let the loading splash outstay its welcome if the map's
+  // "idle" event is slow (or never fires on a flaky tile fetch).
+  useEffect(() => {
+    const t = setTimeout(() => setMapLoaded(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Connectivity indicator — reinforces the "works offline" story.
   useEffect(() => {
@@ -481,6 +489,14 @@ export default function App() {
 
       <div className="device">
         <div className="app">
+          {/* Loading gate — hold until the map is fully rendered + interactive. */}
+          <div className={`app-splash${mapLoaded ? " done" : ""}`} aria-hidden={mapLoaded}>
+            <img className="splash-logo" src={coverLogo} alt="" />
+            <div className="splash-title">Solio Game Reserve</div>
+            <div className="splash-spinner" />
+            <div className="splash-note">Preparing the reserve map…</div>
+          </div>
+
           {showWelcome && <Welcome onStart={() => setShowWelcome(false)} />}
 
           <header className="topbar">
@@ -513,6 +529,7 @@ export default function App() {
             onSelectPoi={(p) => { setSelectedPoiId(p.id); setOpenPoiId(p.id); setSelectedSightingId(null); }}
             onSelectSighting={(id) => { setSelectedSightingId(id); setOpenPoiId(null); }}
             onUserPan={() => setFollow(false)}
+            onLoaded={() => setMapLoaded(true)}
           />
 
           {/* Live navigation banner */}
