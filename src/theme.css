@@ -163,7 +163,7 @@ body {
 
 /* ---------------------------------------------------------------- Layout */
 .layout { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.map-pane { position: relative; flex: 0 0 46%; min-height: 0; min-width: 0; }
+.map-pane { position: relative; flex: 0 0 66%; min-height: 0; min-width: 0; }
 .panel { flex: 1 1 auto; background: var(--bone); display: flex; flex-direction: column; min-height: 0; min-width: 0; border-top: 1px solid var(--line); }
 
 /* Full-screen map: the map takes the whole stage, the panel is hidden. */
@@ -493,7 +493,7 @@ body {
   .device { height: 100vh; height: 100dvh; width: 100vw; min-width: 0; aspect-ratio: auto; border-radius: 0; padding: 0; box-shadow: none; }
   .device::after { display: none; }
   .app { border-radius: 0; width: 100%; min-width: 0; }
-  .map-pane { flex: 0 0 44%; }
+  .map-pane { flex: 0 0 66%; }
   /* Drop the costly feTurbulence paper grain on phones for smoother map repaint. */
   .paper-grain { display: none; }
 }
