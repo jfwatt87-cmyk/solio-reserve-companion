@@ -1,0 +1,42 @@
+{
+  "name": "Solio Game Reserve \u2014 Companion",
+  "short_name": "Solio",
+  "description": "Find your way through the reserve, follow a game drive and log your sightings \u2014 online or offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#2C3B2D",
+  "theme_color": "#2C3B2D",
+  "orientation": "portrait",
+  "categories": [
+    "travel",
+    "navigation",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

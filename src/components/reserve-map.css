@@ -1,0 +1,154 @@
+/* MapLibre map + DOM marker styling for the reserve map.
+   The base map is Callan's georeferenced poster, inlined as a single image
+   source; overlays (POIs, sightings, the live user dot) are HTML markers so
+   they keep the hand-drawn styling and rich interactions, positioned by
+   MapLibre in lng/lat.
+
+   NOTE: MapLibre sets `transform` on the marker's own element every frame to
+   position it, so any scale/offset of ours must live on an INNER child. */
+
+.map-gl {
+  position: absolute;
+  inset: 0;
+  background: #e9e4d8;
+}
+
+/* Tidy the default MapLibre chrome to match the app's look. */
+.map-gl .maplibregl-ctrl-attrib {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.map-gl .maplibregl-ctrl-bottom-left { margin-bottom: 2px; }
+.map-gl .maplibregl-ctrl-scale {
+  border-color: #6b4f32;
+  color: #3a2a1d;
+  background: rgba(255, 255, 255, 0.82);
+  font: 600 11px/1.6 -apple-system, system-ui, sans-serif;
+}
+
+/* ---- Layers panel (top-right, Photoshop-style) -------------------------- */
+.layers-wrap { position: absolute; top: 10px; right: 12px; z-index: 6; }
+.layers-toggle {
+  border: 0;
+  background: rgba(255, 255, 255, 0.92);
+  color: #3a2a1d;
+  font: 600 12px/1 -apple-system, system-ui, sans-serif;
+  padding: 7px 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.layers-toggle.open { background: #7a3b1f; color: #fff; }
+.layers-panel {
+  margin-top: 6px;
+  min-width: 168px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 10px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.25);
+  padding: 10px 12px;
+  font: 13px/1.3 -apple-system, system-ui, sans-serif;
+  color: #2a2a2a;
+}
+.layers-head {
+  font-weight: 700;
+  color: #7a3b1f;
+  margin-bottom: 6px;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.layer-row input { width: 15px; height: 15px; accent-color: #7a3b1f; }
+.layer-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 6px 23px;
+  font-size: 11px;
+  color: #6b5b4a;
+}
+.layer-sub input[type="range"] { flex: 1; accent-color: #7a3b1f; }
+
+/* ---- User "you are here" marker (anchor: center, 0x0 wrapper) ----------- */
+.mk-user { width: 0; height: 0; }
+.mk-user-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2f6fed;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.mk-user-dot::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2f6fed;
+  transform: translate(-50%, -50%);
+  animation: mk-pulse 2.2s ease-out infinite;
+}
+.mk-user-arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 13px solid #2f6fed;
+  filter: drop-shadow(0 0 1px #fff);
+  /* rotate around the dot centre; arrow tip points along heading */
+  transform: translate(-50%, -34px) rotate(var(--hdg, 0deg));
+  transform-origin: 50% 34px;
+}
+
+@keyframes mk-pulse {
+  0% { width: 20px; height: 20px; opacity: 0.35; }
+  100% { width: 84px; height: 84px; opacity: 0; }
+}
+
+/* ---- POI teardrop pins (anchor: bottom) --------------------------------- */
+.mk-poi {
+  cursor: pointer;
+  text-align: center;
+}
+.mk-poi-pin {
+  width: 26px;
+  height: 32px;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+  transition: transform 0.12s ease;
+  transform-origin: 50% 100%;
+}
+.mk-poi.sel .mk-poi-pin { transform: scale(1.25); }
+
+/* ---- Sighting markers (anchor: center) ---------------------------------- */
+.mk-sight { cursor: pointer; }
+.mk-sight-body {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #a6442e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+}
+.mk-sight.sel .mk-sight-body { box-shadow: 0 0 0 3px rgba(166, 68, 46, 0.5); }

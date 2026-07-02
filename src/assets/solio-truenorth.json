@@ -1,0 +1,35 @@
+{
+  "corners": {
+    "tl": [
+      36.8669465,
+      -0.0892246
+    ],
+    "tr": [
+      37.0026852,
+      -0.1010203
+    ],
+    "br": [
+      36.9848002,
+      -0.3060862
+    ],
+    "bl": [
+      36.8490616,
+      -0.2942907
+    ]
+  },
+  "bearing": 4.984,
+  "merc2px": [
+    0.2759956596586082,
+    -0.024070994166535388,
+    -1132927.9521983557,
+    -0.025592883133564094,
+    -0.29450892625546676,
+    102108.24779531544
+  ],
+  "px": [
+    4202,
+    6774
+  ],
+  "note": "Poster is pinned AXIS-ALIGNED in the app (always square). Real lng/lat are projected to EPSG:3857 then to pixel via `merc2px`, then to the display box, so overlays stay on-feature. `bearing` orients the compass/heading.",
+  "source": "SOLIO_MAP_FINAL_straightened_georef_compass_true_north.tif"
+}
