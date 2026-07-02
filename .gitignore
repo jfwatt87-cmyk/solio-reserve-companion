@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# build output (GitHub Actions rebuilds from source)
+dist/
+tsconfig.tsbuildinfo
+
+# old standalone Leaflet prototype (26 MB, not part of the app)
+prototype/
+
+# editor / OS cruft
+.DS_Store
+*.local
+.vscode/
+.idea/
