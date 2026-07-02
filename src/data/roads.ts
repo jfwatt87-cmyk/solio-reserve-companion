@@ -57,6 +57,11 @@ const RAW_NODES: RawNode[] = [
   //   j14 — River Drive corner where the Riverbank Track heads east; jw spur
   //   j15 — Riverbank Track joins the Acacia Loop corridor
   //   j16 — Acacia Loop / Bush Track (choroa) fork
+  //   j17 — Carissa Plain Track / Rhino Gate Road merge at the river ford,
+  //         just north of the drawn crossing; the final approach to Rhino
+  //         Gate is a single shared edge from here
+  //   j18 — drawn crossroads where the Bush Track joins the Choroa Track;
+  //         the tail to choroa is a single shared edge from here
   { id: "j6", pixel: { x: 909, y: 2258 } },
   { id: "j7", pixel: { x: 827, y: 2384 } },
   { id: "j8", pixel: { x: 1556, y: 1087 } },
@@ -68,6 +73,8 @@ const RAW_NODES: RawNode[] = [
   { id: "j14", pixel: { x: 881, y: 1903 } },
   { id: "j15", pixel: { x: 1081, y: 1862 } },
   { id: "j16", pixel: { x: 1331, y: 1623 } },
+  { id: "j17", pixel: { x: 1926, y: 967 } },
+  { id: "j18", pixel: { x: 1436, y: 1579 } },
 ];
 
 interface RawEdge {
@@ -91,7 +98,7 @@ const RAW_EDGES: RawEdge[] = [
     b: "j13",
     name: "Gate Road",
     type: "graded",
-    via: [{ x: 588, y: 2674 }, { x: 592, y: 2673 }, { x: 609, y: 2668 }, { x: 619, y: 2660 }, { x: 629, y: 2662 }, { x: 645, y: 2656 }, { x: 658, y: 2644 }, { x: 670, y: 2644 }, { x: 675, y: 2640 }, { x: 686, y: 2640 }, { x: 693, y: 2632 }, { x: 701, y: 2632 }, { x: 708, y: 2636 }, { x: 714, y: 2636 }, { x: 717, y: 2633 }, { x: 721, y: 2620 }, { x: 726, y: 2613 }, { x: 732, y: 2609 }, { x: 741, y: 2608 }, { x: 747, y: 2605 }, { x: 748, y: 2600 }, { x: 745, y: 2594 }, { x: 747, y: 2583 }, { x: 751, y: 2579 }, { x: 764, y: 2574 }, { x: 768, y: 2571 }, { x: 771, y: 2552 }, { x: 780, y: 2542 }],
+    via: [{ x: 609, y: 2668 }, { x: 619, y: 2660 }, { x: 629, y: 2662 }, { x: 645, y: 2656 }, { x: 658, y: 2644 }, { x: 670, y: 2644 }, { x: 675, y: 2640 }, { x: 686, y: 2640 }, { x: 693, y: 2632 }, { x: 701, y: 2632 }, { x: 708, y: 2636 }, { x: 714, y: 2636 }, { x: 717, y: 2633 }, { x: 721, y: 2620 }, { x: 726, y: 2613 }, { x: 732, y: 2609 }, { x: 741, y: 2608 }, { x: 747, y: 2605 }, { x: 748, y: 2600 }, { x: 745, y: 2594 }, { x: 747, y: 2583 }, { x: 751, y: 2579 }, { x: 764, y: 2574 }, { x: 768, y: 2571 }, { x: 771, y: 2552 }, { x: 780, y: 2542 }],
   },
   // The orphanage sits on a short spur off the j13 fork by Waterbuck Bridge,
   // where the Gate Road meets Lodge Lane.
@@ -111,7 +118,7 @@ const RAW_EDGES: RawEdge[] = [
     b: "j1",
     name: "Zebra Plain Track",
     type: "dirt",
-    via: [{ x: 588, y: 2674 }, { x: 592, y: 2673 }, { x: 609, y: 2668 }, { x: 619, y: 2660 }, { x: 619, y: 2658 }, { x: 615, y: 2653 }, { x: 612, y: 2640 }, { x: 613, y: 2621 }, { x: 611, y: 2604 }, { x: 609, y: 2588 }, { x: 610, y: 2566 }, { x: 612, y: 2545 }, { x: 619, y: 2524 }, { x: 626, y: 2503 }, { x: 634, y: 2483 }, { x: 645, y: 2477 }, { x: 657, y: 2472 }, { x: 675, y: 2466 }, { x: 694, y: 2460 }, { x: 705, y: 2452 }, { x: 713, y: 2449 }, { x: 726, y: 2440 }, { x: 739, y: 2430 }],
+    via: [{ x: 609, y: 2668 }, { x: 619, y: 2660 }, { x: 619, y: 2658 }, { x: 615, y: 2653 }, { x: 612, y: 2640 }, { x: 613, y: 2621 }, { x: 611, y: 2604 }, { x: 609, y: 2588 }, { x: 610, y: 2566 }, { x: 612, y: 2545 }, { x: 619, y: 2524 }, { x: 626, y: 2503 }, { x: 634, y: 2483 }, { x: 645, y: 2477 }, { x: 657, y: 2472 }, { x: 675, y: 2466 }, { x: 694, y: 2460 }, { x: 705, y: 2452 }, { x: 713, y: 2449 }, { x: 726, y: 2440 }, { x: 739, y: 2430 }],
   },
   {
     a: "j1",
@@ -249,35 +256,60 @@ const RAW_EDGES: RawEdge[] = [
     type: "dirt",
     via: [{ x: 1732, y: 994 }, { x: 1750, y: 999 }, { x: 1766, y: 1011 }, { x: 1779, y: 1023 }, { x: 1798, y: 1035 }, { x: 1810, y: 1035 }, { x: 1822, y: 1036 }, { x: 1837, y: 1024 }],
   },
+  // The j9 road rides the river's north bank to the ford junction at j17;
+  // it never spans the drawn river, so no crossing here.
   {
     a: "j9",
+    b: "j17",
+    name: "Rhino Gate Road",
+    type: "graded",
+    via: [{ x: 1737, y: 988 }, { x: 1752, y: 974 }, { x: 1764, y: 971 }, { x: 1767, y: 968 }, { x: 1776, y: 967 }, { x: 1791, y: 971 }, { x: 1803, y: 976 }, { x: 1806, y: 980 }, { x: 1824, y: 980 }, { x: 1835, y: 984 }, { x: 1848, y: 984 }, { x: 1861, y: 979 }, { x: 1878, y: 981 }, { x: 1893, y: 974 }, { x: 1915, y: 980 }, { x: 1923, y: 984 }, { x: 1926, y: 973 }],
+  },
+  // Single shared final approach from the j17 ford junction to Rhino Gate.
+  // The drawn tributary stays east of this road, so no crossing on it either;
+  // the one bridge in this cluster is on the Carissa branch that spans the river.
+  {
+    a: "j17",
     b: "rhinogate",
     name: "Rhino Gate Road",
     type: "graded",
-    crossing: true,
-    via: [{ x: 1737, y: 988 }, { x: 1752, y: 974 }, { x: 1764, y: 971 }, { x: 1767, y: 968 }, { x: 1776, y: 967 }, { x: 1791, y: 971 }, { x: 1803, y: 976 }, { x: 1806, y: 980 }, { x: 1824, y: 980 }, { x: 1835, y: 984 }, { x: 1848, y: 984 }, { x: 1861, y: 979 }, { x: 1878, y: 981 }, { x: 1893, y: 974 }, { x: 1915, y: 980 }, { x: 1923, y: 984 }, { x: 1926, y: 973 }, { x: 1926, y: 967 }, { x: 1942, y: 950 }, { x: 1957, y: 933 }, { x: 1968, y: 925 }, { x: 1979, y: 919 }, { x: 1990, y: 914 }, { x: 2013, y: 911 }, { x: 2028, y: 911 }, { x: 2036, y: 921 }, { x: 2037, y: 920 }],
+    via: [{ x: 1942, y: 950 }, { x: 1957, y: 933 }, { x: 1968, y: 925 }, { x: 1979, y: 919 }, { x: 1990, y: 914 }, { x: 2013, y: 911 }, { x: 2028, y: 911 }, { x: 2036, y: 921 }, { x: 2037, y: 920 }],
   },
   {
     a: "j3",
+    b: "j18",
+    name: "Choroa Track",
+    type: "dirt",
+    via: [{ x: 1384, y: 1465 }, { x: 1387, y: 1470 }, { x: 1394, y: 1471 }, { x: 1404, y: 1476 }, { x: 1409, y: 1481 }, { x: 1414, y: 1489 }, { x: 1414, y: 1503 }, { x: 1414, y: 1517 }, { x: 1418, y: 1539 }, { x: 1423, y: 1557 }, { x: 1429, y: 1574 }, { x: 1431, y: 1577 }],
+  },
+  // The 4x4 Bush Track ends where it joins the Choroa Track at the drawn
+  // crossroads (j18); the shared dirt tail into choroa is a single edge below.
+  {
+    a: "j16",
+    b: "j18",
+    name: "Bush Track",
+    type: "4x4",
+    via: [{ x: 1339, y: 1623 }, { x: 1347, y: 1627 }, { x: 1357, y: 1614 }, { x: 1377, y: 1612 }, { x: 1391, y: 1601 }, { x: 1405, y: 1590 }, { x: 1413, y: 1586 }, { x: 1420, y: 1584 }, { x: 1432, y: 1586 }],
+  },
+  // Shared tail from the j18 crossroads to choroa. The traced centreline ends
+  // ~42px short of the choroa node (the drawn road fades at the pool); that
+  // known gap now lives on this one edge only.
+  {
+    a: "j18",
     b: "choroa",
     name: "Choroa Track",
     type: "dirt",
-    via: [{ x: 1384, y: 1465 }, { x: 1387, y: 1470 }, { x: 1394, y: 1471 }, { x: 1404, y: 1476 }, { x: 1409, y: 1481 }, { x: 1414, y: 1489 }, { x: 1414, y: 1503 }, { x: 1414, y: 1517 }, { x: 1418, y: 1539 }, { x: 1423, y: 1557 }, { x: 1429, y: 1574 }, { x: 1431, y: 1577 }, { x: 1436, y: 1579 }, { x: 1448, y: 1571 }, { x: 1461, y: 1563 }, { x: 1470, y: 1560 }, { x: 1484, y: 1564 }, { x: 1498, y: 1567 }, { x: 1512, y: 1568 }, { x: 1527, y: 1570 }, { x: 1543, y: 1581 }, { x: 1553, y: 1583 }, { x: 1561, y: 1583 }, { x: 1572, y: 1571 }, { x: 1581, y: 1566 }, { x: 1601, y: 1568 }],
+    via: [{ x: 1448, y: 1571 }, { x: 1461, y: 1563 }, { x: 1470, y: 1560 }, { x: 1484, y: 1564 }, { x: 1498, y: 1567 }, { x: 1512, y: 1568 }, { x: 1527, y: 1570 }, { x: 1543, y: 1581 }, { x: 1553, y: 1583 }, { x: 1561, y: 1583 }, { x: 1572, y: 1571 }, { x: 1581, y: 1566 }, { x: 1601, y: 1568 }],
   },
-  {
-    a: "j16",
-    b: "choroa",
-    name: "Bush Track",
-    type: "4x4",
-    via: [{ x: 1339, y: 1623 }, { x: 1347, y: 1627 }, { x: 1357, y: 1614 }, { x: 1377, y: 1612 }, { x: 1391, y: 1601 }, { x: 1405, y: 1590 }, { x: 1413, y: 1586 }, { x: 1420, y: 1584 }, { x: 1432, y: 1586 }, { x: 1438, y: 1577 }, { x: 1451, y: 1569 }, { x: 1465, y: 1561 }, { x: 1473, y: 1561 }, { x: 1485, y: 1564 }, { x: 1498, y: 1567 }, { x: 1512, y: 1568 }, { x: 1527, y: 1570 }, { x: 1543, y: 1581 }, { x: 1553, y: 1583 }, { x: 1561, y: 1583 }, { x: 1572, y: 1571 }, { x: 1581, y: 1566 }, { x: 1601, y: 1568 }],
-  },
+  // Comes up the river's south bank from naribo and spans the drawn river at
+  // the ford just before j17 — the one bridge on the Rhino Gate approach.
   {
     a: "naribo",
-    b: "rhinogate",
+    b: "j17",
     name: "Carissa Plain Track",
     type: "dirt",
     crossing: true,
-    via: [{ x: 1837, y: 1024 }, { x: 1848, y: 1015 }, { x: 1865, y: 1006 }, { x: 1868, y: 1008 }, { x: 1876, y: 1008 }, { x: 1885, y: 1000 }, { x: 1905, y: 1000 }, { x: 1918, y: 995 }, { x: 1924, y: 983 }, { x: 1926, y: 967 }, { x: 1929, y: 966 }, { x: 1936, y: 955 }, { x: 1950, y: 941 }, { x: 1964, y: 928 }, { x: 1981, y: 918 }, { x: 1994, y: 913 }, { x: 2007, y: 912 }, { x: 2020, y: 910 }, { x: 2028, y: 911 }, { x: 2036, y: 921 }, { x: 2037, y: 920 }],
+    via: [{ x: 1837, y: 1024 }, { x: 1848, y: 1015 }, { x: 1865, y: 1006 }, { x: 1868, y: 1008 }, { x: 1876, y: 1008 }, { x: 1885, y: 1000 }, { x: 1905, y: 1000 }, { x: 1918, y: 995 }, { x: 1924, y: 983 }],
   },
 ];
 
