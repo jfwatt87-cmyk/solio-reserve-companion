@@ -3,7 +3,7 @@
 A companion app for guests of **Solio Game Reserve** (Laikipia, Kenya): the
 reserve's own hand-drawn map, georeferenced so a live GPS dot lands on the
 right drawn feature, with on-reserve turn-by-turn navigation, self-guided
-game drives, a bird guide and a wildlife sightings log — all working **fully
+game drives — all working **fully
 offline** once loaded.
 
 Technically it is a **React + TypeScript + Vite + MapLibre GL** progressive
@@ -23,8 +23,7 @@ overrides every feature decision in this codebase:
 
 - The app carries **no rhino tracking of any kind** — no positions, no
   proximity hints, no heat maps.
-- Rhino is deliberately **not a loggable sighting species**
-  (`src/lib/sightings.ts`), so guests can never pin a rhino's precise
+- No animal-location data exists in the app at all — guests can never pin a rhino's precise
   location themselves.
 - The Phase 2 backend schema (`supabase/`) enforces this **at the database
   layer**: guests and guides have *no row-level-security policy at all* on
@@ -94,19 +93,16 @@ solio-poc/
   src/
     main.tsx                 entry (StrictMode + ErrorBoundary)
     App.tsx                  app state: tabs, sim/GPS source, navigation,
-                             tours, sightings, welcome screen, phone frame
+                             tours, welcome screen, phone frame
     components/
       ReserveMap.tsx         the MapLibre map: raster-tile basemap pinned to
                              its display box + all GPS-aligned overlays
-      BirdsTab.tsx, BirdArt.tsx   bird guide (stylised plates + synth calls)
       ErrorBoundary.tsx
     lib/
       georef.ts              least-squares affine georeference (pixel <-> GPS)
       geo.ts                 WGS84 distance / bearing / path projection helpers
       routing.ts             road graph + A* + alternatives + turn-by-turn
       sim.ts                 pose along a path (the demo drive)
-      sightings.ts           guest sightings log (localStorage; rhino excluded)
-      birdsong.ts            synthesised bird-call playback
     data/
       reserve.ts             the pixel coordinate system + corner ground
                              control points (read from Callan's GeoTIFF)
@@ -114,7 +110,6 @@ solio-poc/
       roadSource.ts          selector — auto-prefers roads.gis.ts if generated
       pois.ts                visitor destinations (digitised on the real map)
       tours.ts               self-guided drives (stops + commentary)
-      birds.ts               bird species data
     assets/
       solio-truenorth.jpg/.json   exported basemap + its georeference
       tiles-meta.json             tile-pyramid metadata (bounds, zooms)
@@ -162,7 +157,7 @@ GPS-exact. The pipeline (all in `tools/basemap/`, Python):
 
 3. **In the app** — `ReserveMap.tsx` adds the pyramid as a MapLibre raster
    source pinned to that same display box (`src/assets/tiles-meta.json`
-   carries bounds/zooms). Overlays (POIs, routes, sightings, the GPS dot) are
+   carries bounds/zooms). Overlays (POIs, routes, the GPS dot) are
    authored either directly in lng/lat or in the poster's pixel space and
    lifted to lng/lat through the shared affine georeference
    (`src/lib/georef.ts`, control points in `src/data/reserve.ts` — taken from
@@ -225,7 +220,7 @@ into the app yet; it ships when Phase 2 is funded.
 **Phase 1 — Foundation & guest map (now).**
 Everything in this repo: georeferenced basemap as offline tiles, GPS
 self-location, traced road network with turn-by-turn navigation and
-alternatives, self-guided drives, bird guide, on-device sightings log,
+alternatives, self-guided drives,
 PWA install + offline, GitHub Pages deployment. Real GIS boundary / roads /
 rivers / POIs from Solio drop in via the importers as they arrive.
 

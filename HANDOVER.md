@@ -25,7 +25,7 @@ Open this on your phone:
 
 | Item | What it is |
 |---|---|
-| The code (`src/`, `tools/`, etc.) | The full app source — map, navigation, drives, bird guide, sightings |
+| The code (`src/`, `tools/`, etc.) | The full app source — map, navigation, self-guided drives |
 | `README.md` | The technical guide for any developer who works on this in future |
 | `public/tiles/` | Your poster, converted into the fast map format phones need |
 | `supabase/` | The designed (not yet live) system for Phase 2 live vehicle tracking |
