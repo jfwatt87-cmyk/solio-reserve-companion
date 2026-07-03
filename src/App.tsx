@@ -1,33 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ReserveMap } from "./components/ReserveMap";
-import { BirdsTab } from "./components/BirdsTab";
 import coverLogo from "./assets/solio-logo.png";
 import { createGeoReference, pixelWorld, MAP_MARGIN } from "./data/reserve";
 import { createRoadNetwork, NODE_PIXEL } from "./data/roadSource";
 import { POIS, poiWorld, type Poi } from "./data/pois";
 import { TOURS, type Tour } from "./data/tours";
 import {
-  SIGHTING_KINDS,
-  kindOf,
-  loadSightings,
-  saveSightings,
-  newSighting,
-  seedSightings,
-  type Sighting,
-} from "./lib/sightings";
-import {
   distanceMeters,
   destinationPoint,
   pointToPathMeters,
   projectOnPath,
   formatDistance,
-  timeAgo,
   type LatLng,
 } from "./lib/geo";
 import { maneuverLabel, type Route } from "./lib/routing";
 import { pathLength, poseAlong } from "./lib/sim";
 
-type Tab = "explore" | "drives" | "birds" | "about";
+type Tab = "explore" | "drives" | "about";
 type Source = "sim" | "gps";
 
 const SPEED_MPS = 15; // simulated game-drive speed (~54 km/h peak on tracks)
@@ -57,7 +46,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(() => {
     if (typeof window === "undefined") return "explore";
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t === "drives" || t === "birds" || t === "about" ? t : "explore";
+    return t === "drives" || t === "about" ? t : "explore";
   });
   const [source, setSource] = useState<Source>("sim");
   // Start with the camera NOT chasing the demo dot, so the map is immediately
@@ -77,19 +66,6 @@ export default function App() {
   const [tourAtStop, setTourAtStop] = useState(false);
   const tourDriving = useRef(false);
 
-  // Wildlife sightings log (persisted offline in localStorage).
-  const [sightings, setSightings] = useState<Sighting[]>(() => {
-    const stored = loadSightings();
-    if (stored.length) return stored;
-    return seedSightings({
-      waterholeS: poiWorld(POIS.find((p) => p.id === "choroa")!),
-      waterholeE: poiWorld(POIS.find((p) => p.id === "naribo")!),
-    });
-  });
-  const [logOpen, setLogOpen] = useState(false);
-  const [logKind, setLogKind] = useState<string | null>(null); // chosen species awaiting an optional note
-  const [logNote, setLogNote] = useState("");
-  const [selectedSightingId, setSelectedSightingId] = useState<string | null>(null);
   const [driving, setDriving] = useState(false);
   const [activeRoute, setActiveRoute] = useState<Route | null>(null);
   // Route choices for the current destination (best first); index of the picked one.
@@ -144,9 +120,6 @@ export default function App() {
     const t = setTimeout(() => setToast(null), 4200);
     return () => clearTimeout(t);
   }, [toast]);
-
-  // Persist the sightings log so it survives offline / across sessions.
-  useEffect(() => { saveSightings(sightings); }, [sightings]);
 
   // Reset the panel scroll to the top whenever the tab changes.
   useEffect(() => { panelBodyRef.current?.scrollTo({ top: 0 }); }, [tab]);
@@ -259,9 +232,6 @@ export default function App() {
   }, [source]);
 
   const openPoi = openPoiId ? POIS.find((p) => p.id === openPoiId) ?? null : null;
-  const selectedSighting = selectedSightingId
-    ? sightings.find((s) => s.id === selectedSightingId) ?? null
-    : null;
 
   const destPoi = destPoiId ? POIS.find((p) => p.id === destPoiId) ?? null : null;
 
@@ -449,27 +419,6 @@ export default function App() {
     setPlaying(true);
   }
 
-  // ---- Sightings log -------------------------------------------------------
-  function openLog() { setLogKind(null); setLogNote(""); setLogOpen(true); }
-  function closeLog() { setLogOpen(false); setLogKind(null); setLogNote(""); }
-  function saveSighting() {
-    if (!logKind) return;
-    if (!user) { setToast("Waiting for your location…"); return; }
-    setSightings((s) => [newSighting(logKind, user, logNote), ...s]);
-    const label = kindOf(logKind).label;
-    closeLog();
-    setToast(`Logged ${label} sighting`);
-  }
-  function removeSighting(id: string) {
-    setSightings((s) => s.filter((x) => x.id !== id));
-  }
-  function shareSighting(id: string) {
-    // PoC: marks the sighting locally; a backend would transmit it to rangers.
-    setSightings((s) => s.map((x) => (x.id === id ? { ...x, sharedAt: Date.now() } : x)));
-    const sighting = sightings.find((x) => x.id === id);
-    setToast(`Marked for rangers (demo)${sighting ? ` · ${kindOf(sighting.kindId).label}` : ""}`);
-  }
-
   return (
     <div className="stage">
       <aside className="pitch">
@@ -478,8 +427,8 @@ export default function App() {
         <h1 className="pitch-title">Find your way<br />through the wild.</h1>
         <p className="pitch-lead">
           A companion app for Solio Game Reserve — guests see themselves on the
-          reserve's own map, navigate the tracks, and log what they spot along
-          the way. Built to put conservation in every visitor's pocket.
+          reserve's own map, navigate the tracks, and follow curated game
+          drives. Built to put conservation in every visitor's pocket.
         </p>
         <ul className="pitch-points">
           <li><span>◎</span><div><b>You-are-here</b><br />on Solio's own map, even offline.</div></li>
@@ -524,12 +473,9 @@ export default function App() {
             heading={heading}
             route={displayRoute}
             altRoutes={altRoutePaths}
-            sightings={sightings}
             selectedPoiId={selectedPoiId}
-            selectedSightingId={selectedSightingId}
             follow={follow}
-            onSelectPoi={(p) => { setSelectedPoiId(p.id); setOpenPoiId(p.id); setSelectedSightingId(null); }}
-            onSelectSighting={(id) => { setSelectedSightingId(id); setOpenPoiId(null); }}
+            onSelectPoi={(p) => { setSelectedPoiId(p.id); setOpenPoiId(p.id); }}
             onUserPan={() => setFollow(false)}
             onLoaded={() => setMapLoaded(true)}
           />
@@ -618,53 +564,7 @@ export default function App() {
                 </svg>
               </button>
             )}
-            <button className="fab fab-log" onClick={() => (logOpen ? closeLog() : openLog())} title="Log a sighting" aria-label="Log a sighting">
-              <Binoculars />
-            </button>
           </div>
-
-          {/* Sighting logger — pick a species, then an optional note */}
-          {logOpen && (
-            <div className="log-sheet">
-              {!logKind ? (
-                <>
-                  <div className="log-sheet-head">
-                    <b>Log a sighting</b>
-                    <button className="pop-close dark" onClick={closeLog} aria-label="Close">×</button>
-                  </div>
-                  <div className="log-sheet-sub">Pinned at your current location.</div>
-                  <div className="log-grid">
-                    {SIGHTING_KINDS.map((k) => (
-                      <button key={k.id} className="log-chip" onClick={() => setLogKind(k.id)}>
-                        <span>{k.icon}</span>{k.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="log-sheet-head">
-                    <b>{kindOf(logKind).icon} {kindOf(logKind).label}</b>
-                    <button className="pop-close dark" onClick={closeLog} aria-label="Close">×</button>
-                  </div>
-                  <div className="log-sheet-sub">Add a note (optional) — how many, behaviour, anything notable.</div>
-                  <textarea
-                    className="log-note"
-                    value={logNote}
-                    onChange={(e) => setLogNote(e.target.value)}
-                    placeholder="e.g. Bull with two cows, browsing acacia"
-                    rows={2}
-                    maxLength={140}
-                    autoFocus
-                  />
-                  <div className="log-note-actions">
-                    <button className="btn sm" onClick={() => { setLogKind(null); setLogNote(""); }}>← Back</button>
-                    <button className="btn btn-accent sm" onClick={saveSighting}>Save sighting</button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
           {/* Tour commentary at each stop */}
           {tour && tourAtStop && currentStop && (
@@ -700,49 +600,12 @@ export default function App() {
             </div>
           )}
 
-          {/* Sighting info popup */}
-          {selectedSighting && (
-            <div className="poi-pop sighting-pop">
-              <button className="pop-close dark" onClick={() => setSelectedSightingId(null)} aria-label="Close">×</button>
-              <div className="poi-pop-title">
-                <span className="sighting-pop-ico">{kindOf(selectedSighting.kindId).icon}</span>
-                {kindOf(selectedSighting.kindId).label}
-              </div>
-              {selectedSighting.note
-                ? <div className="poi-pop-note sighting-note">“{selectedSighting.note}”</div>
-                : <div className="poi-pop-note">No note added.</div>}
-              <div className="poi-pop-dist sighting-pop-meta">
-                {timeAgo(selectedSighting.at)}
-                {user ? ` · ${formatDistance(distanceMeters(user, { lat: selectedSighting.lat, lng: selectedSighting.lng }))} away` : ""}
-              </div>
-              {selectedSighting.sharedAt && (
-                <div className="shared-badge">🛡 Marked for rangers (demo) · {timeAgo(selectedSighting.sharedAt)}</div>
-              )}
-              <div className="sighting-pop-btns">
-                {!selectedSighting.sharedAt && (
-                  <button className="btn btn-accent sm" onClick={() => shareSighting(selectedSighting.id)}>
-                    🛡 Share with rangers
-                  </button>
-                )}
-                <button
-                  className="btn sm"
-                  onClick={() => { removeSighting(selectedSighting.id); setSelectedSightingId(null); }}
-                >
-                  Remove
-                </button>
-              </div>
-              {!selectedSighting.sharedAt && (
-                <div className="sighting-pop-hint">Proof of concept: marks this sighting for ranger handover on this device only — nothing is transmitted yet.</div>
-              )}
-            </div>
-          )}
         </section>
 
         <aside className="panel">
           <nav className="tabs">
             <button className={tab === "explore" ? "active" : ""} onClick={() => setTab("explore")}>Explore</button>
             <button className={tab === "drives" ? "active" : ""} onClick={() => setTab("drives")}>Drives</button>
-            <button className={tab === "birds" ? "active" : ""} onClick={() => setTab("birds")}>Birds</button>
             <button className={tab === "about" ? "active" : ""} onClick={() => setTab("about")}>About</button>
           </nav>
 
@@ -769,11 +632,8 @@ export default function App() {
                 pois={POIS}
                 user={user}
                 selectedPoiId={selectedPoiId}
-                sightings={sightings}
                 onSelect={(p) => { setSelectedPoiId(p.id); setOpenPoiId(p.id); }}
                 onNavigate={navigateTo}
-                onLog={openLog}
-                onRemoveSighting={removeSighting}
               />
             )}
             {tab === "drives" && (
@@ -785,7 +645,6 @@ export default function App() {
                 onEnd={endTour}
               />
             )}
-            {tab === "birds" && <BirdsTab />}
             {tab === "about" && <AboutTab cpCount={4} />}
           </div>
         </aside>
@@ -830,11 +689,8 @@ function ExploreTab(props: {
   pois: Poi[];
   user: LatLng | null;
   selectedPoiId: string | null;
-  sightings: Sighting[];
   onSelect: (p: Poi) => void;
   onNavigate: (p: Poi) => void;
-  onLog: () => void;
-  onRemoveSighting: (id: string) => void;
 }) {
   const list = useMemo(() => {
     const withDist = props.pois.map((p) => ({
@@ -844,43 +700,8 @@ function ExploreTab(props: {
     return props.user ? withDist.sort((a, b) => a.dist - b.dist) : withDist;
   }, [props.pois, props.user]);
 
-  const recent = useMemo(
-    () => [...props.sightings].sort((a, b) => b.at - a.at),
-    [props.sightings],
-  );
-
   return (
     <div className="list">
-      {/* Wildlife sightings log */}
-      <div className="section-head">
-        <span>Your sightings</span>
-        <button className="btn btn-accent sm" onClick={props.onLog}>＋ Log a sighting</button>
-      </div>
-      {recent.length === 0 ? (
-        <p className="hint">No sightings yet. Spot something? Tap “Log a sighting” to pin it on the map.</p>
-      ) : (
-        recent.slice(0, 6).map((s) => {
-          const k = kindOf(s.kindId);
-          const dist = props.user ? distanceMeters(props.user, { lat: s.lat, lng: s.lng }) : null;
-          return (
-            <div key={s.id} className="card sighting-card">
-              <div className="sighting-ico">{k.icon}</div>
-              <div className="card-main">
-                <div className="card-title">
-                  {k.label}
-                  {s.sharedAt && <span className="tag shared-tag">🛡 Marked</span>}
-                </div>
-                {s.note && <div className="card-sub sighting-note">“{s.note}”</div>}
-                <div className="card-sub mono">
-                  {timeAgo(s.at)}{dist != null ? ` · ${formatDistance(dist)} away` : ""}
-                </div>
-              </div>
-              <button className="btn sm" onClick={() => props.onRemoveSighting(s.id)} aria-label="Remove sighting">✕</button>
-            </div>
-          );
-        })
-      )}
-
       <div className="section-head">
         <span>Places</span>
       </div>
@@ -1000,19 +821,6 @@ function AboutTab(props: { cpCount: number }) {
 }
 
 /* ---------------------------------------------------------------- helpers */
-
-/** Binoculars glyph for the "log a sighting" button. */
-function Binoculars() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="6.5" cy="15" r="3.7" />
-      <circle cx="17.5" cy="15" r="3.7" />
-      <path d="M5 11.6 L6 6.4 a1.6 1.6 0 0 1 3 0 L9.6 12.2" />
-      <path d="M19 11.6 L18 6.4 a1.6 1.6 0 0 0 -3 0 L14.4 12.2" />
-      <path d="M9.6 13.4 q2.4 -1.4 4.8 0" />
-    </svg>
-  );
-}
 
 function etaMinutes(meters: number): number {
   return Math.max(1, Math.round(meters / SPEED_MPS / 60));

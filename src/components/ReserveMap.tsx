@@ -20,24 +20,20 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./reserve-map.css";
 import baseMeta from "../assets/solio-truenorth.json";
 import tilesMeta from "../assets/tiles-meta.json";
-import { SHOW_ROADS, SHOW_ROUTE, SHOW_SIGHTINGS, SHOW_POIS, pixelWorld } from "../data/reserve";
+import { SHOW_ROADS, SHOW_ROUTE, SHOW_POIS, pixelWorld } from "../data/reserve";
 import { ROAD_GEOMS } from "../data/roadSource";
 import { POIS, type Poi } from "../data/pois";
 import { type LatLng } from "../lib/geo";
 import type { Route } from "../lib/routing";
-import { kindOf, type Sighting } from "../lib/sightings";
 
 interface Props {
   user: LatLng | null;
   heading: number | null;
   route: Route | null;
   altRoutes: LatLng[][];
-  sightings: Sighting[];
   selectedPoiId: string | null;
-  selectedSightingId: string | null;
   follow: boolean;
   onSelectPoi: (p: Poi) => void;
-  onSelectSighting: (id: string) => void;
   onUserPan: () => void;
   /** Fired once the map is fully rendered (style + first tiles) and interactive. */
   onLoaded?: () => void;
@@ -129,7 +125,6 @@ export function ReserveMap(props: Props) {
   // Marker registries.
   const userMarker = useRef<maplibregl.Marker | null>(null);
   const poiMarkers = useRef(new Map<string, { marker: maplibregl.Marker; el: HTMLDivElement }>());
-  const sightMarkers = useRef(new Map<string, { marker: maplibregl.Marker; el: HTMLDivElement }>());
 
   // Photoshop-style layer visibility + base-map opacity, driven by the layers panel.
   const [layers, setLayers] = useState<LayerState>({
@@ -241,7 +236,6 @@ export function ReserveMap(props: Props) {
       mapRef.current = null;
       userMarker.current = null;
       poiMarkers.current.clear();
-      sightMarkers.current.clear();
     };
   }, []);
 
@@ -267,39 +261,6 @@ export function ReserveMap(props: Props) {
       poiMarkers.current.set(p.id, { marker, el });
     }
   }, [ready]);
-
-  // ---- Sightings ----------------------------------------------------------
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map || !SHOW_SIGHTINGS) return;
-    const seen = new Set<string>();
-    for (const s of props.sightings) {
-      seen.add(s.id);
-      if (sightMarkers.current.has(s.id)) {
-        sightMarkers.current.get(s.id)!.marker.setLngLat(toDisplay(s.lng, s.lat));
-        continue;
-      }
-      const el = document.createElement("div");
-      el.className = "mk-sight";
-      el.setAttribute("role", "button");
-      el.setAttribute("aria-label", `${kindOf(s.kindId).label} sighting`);
-      el.innerHTML = `<div class="mk-sight-body">${kindOf(s.kindId).icon}</div>`;
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        propsRef.current.onSelectSighting(s.id);
-      });
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-        .setLngLat(toDisplay(s.lng, s.lat))
-        .addTo(map);
-      sightMarkers.current.set(s.id, { marker, el });
-    }
-    for (const [id, entry] of sightMarkers.current) {
-      if (!seen.has(id)) {
-        entry.marker.remove();
-        sightMarkers.current.delete(id);
-      }
-    }
-  }, [ready, props.sightings]);
 
   // ---- User "you are here" marker ----------------------------------------
   useEffect(() => {
@@ -379,9 +340,6 @@ export function ReserveMap(props: Props) {
   useEffect(() => {
     poiMarkers.current.forEach(({ el }, id) => el.classList.toggle("sel", id === props.selectedPoiId));
   }, [props.selectedPoiId, ready]);
-  useEffect(() => {
-    sightMarkers.current.forEach(({ el }, id) => el.classList.toggle("sel", id === props.selectedSightingId));
-  }, [props.selectedSightingId, ready, props.sightings]);
 
   // ---- Layer visibility + base opacity (driven by the layers panel) -------
   useEffect(() => {

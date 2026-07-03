@@ -25,14 +25,12 @@ export const IMAGE_HEIGHT = 3601;
 
 // Per-layer visibility. POIs are re-authored on the real map (in data/pois.ts);
 // the road OVERLAY stays off until real road vectors arrive from Callan (the
-// illustration already draws its own roads), but the active navigation route and
-// guest sightings render. Live rhino tracking is intentionally excluded from this
-// app for the animals' safety — sightings deliberately exclude rhino, so guests
-// can never pin a rhino's precise position.
+// illustration already draws its own roads), but the active navigation route
+// renders. Live rhino tracking is intentionally excluded from this app for the
+// animals' safety — no animal-location data exists in the app at all.
 export const SHOW_POIS = true;
 export const SHOW_ROADS = false;
 export const SHOW_ROUTE = true;
-export const SHOW_SIGHTINGS = true;
 
 /**
  * Pixel margin used when testing whether a GPS fix is "at Solio" — the artwork
