@@ -73,7 +73,7 @@ export const POIS: Poi[] = [
     kind: "orphanage",
     pixel: { x: 759, y: 2514 },
     nodeId: "orphanage",
-    blurb: "Rescue, heal and rewild — visits by arrangement.",
+    blurb: "Rescues and rewilds orphaned rhino.",
   },
   {
     id: "kingfisher",
@@ -81,7 +81,7 @@ export const POIS: Poi[] = [
     kind: "waterhole",
     pixel: { x: 952, y: 1055 },
     nodeId: "kingfisher",
-    blurb: "Northern dam — good for waterbirds at dawn.",
+    blurb: "Northern dam.",
   },
   {
     id: "yellowthorn",
@@ -89,7 +89,7 @@ export const POIS: Poi[] = [
     kind: "waterhole",
     pixel: { x: 1594, y: 1237 },
     nodeId: "yellowthorn",
-    blurb: "Spring-fed dam and hide in the acacia country.",
+    blurb: "Spring-fed dam.",
   },
   {
     id: "naribo",
@@ -97,7 +97,7 @@ export const POIS: Poi[] = [
     kind: "waterhole",
     pixel: { x: 1814, y: 1013 },
     nodeId: "naribo",
-    blurb: "Eastern springs — reliable game viewing.",
+    blurb: "Eastern springs.",
   },
   {
     id: "choroa",
@@ -105,7 +105,7 @@ export const POIS: Poi[] = [
     kind: "waterhole",
     pixel: { x: 1601, y: 1610 },
     nodeId: "choroa",
-    blurb: "Central dam where buffalo and waterbuck gather.",
+    blurb: "Central dam.",
   },
 ];
 

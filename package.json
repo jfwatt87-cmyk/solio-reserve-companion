@@ -6,6 +6,7 @@
   "description": "Proof-of-concept companion app for Solio Game Reserve \u2014 georeferenced reserve map, live self-location, on-reserve navigation, self-guided drives and sightings. No rhino tracking by design.",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node tools/gen-tile-manifest.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

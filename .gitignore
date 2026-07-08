@@ -13,3 +13,9 @@ prototype/
 *.local
 .vscode/
 .idea/
+
+# generated at build (prebuild regenerates from public/tiles/)
+public/tiles-manifest.json
+
+# local deploy artifact
+solio-map-dist.zip

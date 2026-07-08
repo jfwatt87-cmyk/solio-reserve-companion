@@ -220,8 +220,8 @@ body {
 /* Route choices wrap onto their own row under the step + actions. */
 .nav-routes { order: 3; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
 .route-chip {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  padding: 5px 10px; border-radius: 9px; cursor: pointer; line-height: 1.2;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px;
+  padding: 7px 11px; min-height: 40px; border-radius: 9px; cursor: pointer; line-height: 1.2;
   border: 1px solid rgba(244, 239, 230, 0.35);
   background: rgba(244, 239, 230, 0.12); color: var(--bone); font-size: 11px;
 }
@@ -237,7 +237,7 @@ body {
 
 /* ------------------------------------------------------------------ Tabs */
 .tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--bone-2); flex: 0 0 auto; }
-.tabs button { flex: 1; padding: 12px 2px; border: none; background: transparent; font-weight: 600; color: var(--muted); cursor: pointer; font-size: 13px; border-bottom: 3px solid transparent; }
+.tabs button { flex: 1; min-height: 44px; padding: 12px 2px; border: none; background: transparent; font-weight: 600; color: var(--muted); cursor: pointer; font-size: 13px; border-bottom: 3px solid transparent; }
 .tabs button.active { color: var(--green); border-bottom-color: var(--ochre); background: var(--bone); }
 
 .status-row { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
@@ -260,6 +260,10 @@ body {
 .card-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
 .card-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
 .card-sub.mono { font-variant-numeric: tabular-nums; color: var(--brown); margin-top: 4px; }
+.card.coming-soon { flex-direction: column; align-items: flex-start; gap: 8px; cursor: default; text-align: left; padding: 18px; }
+.card.coming-soon:hover { border-color: var(--line); }
+.card.coming-soon:active { transform: none; }
+.coming-soon-tag { align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ochre); background: rgba(200, 147, 47, 0.12); border: 1px solid rgba(200, 147, 47, 0.3); border-radius: 999px; padding: 3px 10px; }
 .card-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
 .dist { font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; }
 .tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; background: var(--bone-2); color: var(--brown); padding: 2px 7px; border-radius: 999px; font-weight: 700; }
@@ -304,6 +308,79 @@ body {
 .welcome-stats b { display: block; font-family: var(--display); font-size: 24px; color: var(--ochre); }
 .welcome-stats span { display: block; font-size: 10.5px; line-height: 1.25; color: rgba(244, 239, 230, 0.62); margin-top: 4px; }
 .welcome-foot { margin-top: 16px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(244, 239, 230, 0.4); }
+.welcome-rules {
+  list-style: none; margin: 0 0 18px; padding: 14px 16px; text-align: left;
+  background: rgba(244, 239, 230, 0.06); border: 1px solid rgba(244, 239, 230, 0.12);
+  border-radius: var(--radius); display: flex; flex-direction: column; gap: 9px;
+}
+.welcome-rules li { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; line-height: 1.4; color: rgba(244, 239, 230, 0.82); }
+.welcome-rules li::before { content: ""; flex: 0 0 auto; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: var(--ochre); }
+.welcome-primer { font-size: 12.5px; line-height: 1.5; color: rgba(244, 239, 230, 0.7); margin: 0 0 18px; }
+
+/* ------------------------------------------------------- Guest GPS status */
+.gps-status {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+  border-bottom: 1px solid var(--line); flex: 0 0 auto;
+  font-size: 12.5px; color: var(--muted); background: var(--bone-2);
+}
+.gps-status-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--ochre); flex: 0 0 auto;
+  animation: gps-pulse 1.3s ease-in-out infinite;
+}
+@keyframes gps-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.gps-error {
+  background: #fbe9e4; color: var(--ink); padding: 11px 13px; flex: 0 0 auto;
+  border-bottom: 1px solid var(--line);
+}
+.gps-error-title { color: var(--clay); font-weight: 700; font-size: 13px; }
+.gps-error-detail { font-size: 12.5px; line-height: 1.45; margin-top: 3px; color: var(--ink); }
+.gps-error-steps { margin: 8px 0 0; padding-left: 20px; font-size: 12px; line-height: 1.5; color: var(--ink); }
+.gps-error-steps li { margin-bottom: 3px; }
+
+/* --------------------------------------------------- In-app browser guard */
+.guard {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+  display: flex; justify-content: center; padding: 12px;
+  background: linear-gradient(180deg, rgba(25, 35, 26, 0.55), transparent);
+  pointer-events: none;
+}
+.guard-card {
+  pointer-events: auto; width: 100%; max-width: 420px;
+  background: var(--green); color: var(--bone);
+  border: 1px solid var(--ochre); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 15px 16px;
+  animation: slide-down 0.28s ease;
+}
+@keyframes slide-down { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+.guard-title { font-weight: 700; font-size: 14.5px; }
+.guard-lead { font-size: 12.5px; line-height: 1.5; color: rgba(244, 239, 230, 0.82); margin: 6px 0 0; }
+.guard-steps { font-size: 12.5px; line-height: 1.5; margin: 8px 0 0; padding: 8px 10px; background: rgba(244, 239, 230, 0.08); border-radius: 8px; }
+.guard-steps b { color: var(--ochre); }
+.guard-actions { display: flex; gap: 8px; margin-top: 12px; }
+.guard-dismiss {
+  display: block; margin: 10px auto 0; background: transparent; border: none;
+  color: rgba(244, 239, 230, 0.55); font-size: 11.5px; text-decoration: underline; cursor: pointer;
+}
+
+/* ----------------------------------------------------- Add to Home Screen */
+.a2hs {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 16;
+  background: var(--bone); border: 1px solid var(--line); border-left: 4px solid var(--ochre);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px;
+  animation: slide-up 0.28s ease;
+}
+.a2hs-close {
+  position: absolute; top: 4px; right: 6px; width: 30px; height: 30px;
+  display: grid; place-items: center; background: transparent; border: none;
+  color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.a2hs-body { display: flex; gap: 11px; align-items: center; padding-right: 20px; }
+.a2hs-mark { width: 34px; height: 34px; object-fit: contain; flex: 0 0 auto; }
+.a2hs-title { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.a2hs-note { font-size: 12px; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+.a2hs-note b { color: var(--ink); }
+.a2hs-share { display: inline-grid; place-items: center; vertical-align: -2px; color: var(--green); }
+.a2hs .btn.block { margin-top: 10px; }
 
 /* -------------------------------------------------------------- Place popup */
 .poi-pop {
@@ -320,7 +397,8 @@ body {
 
 /* -------------------------------------------------------- Popup (shared) */
 .pop-close {
-  position: absolute; top: 7px; right: 10px; background: transparent; border: none;
+  position: absolute; top: 4px; right: 6px; width: 36px; height: 36px;
+  display: grid; place-items: center; background: transparent; border: none;
   color: var(--bone); font-size: 22px; line-height: 1; cursor: pointer; opacity: 0.7;
 }
 .pop-close:hover { opacity: 1; }
@@ -403,4 +481,19 @@ body {
   .map-pane { flex: 0 0 66%; }
   /* Drop the costly feTurbulence paper grain on phones for smoother map repaint. */
   .paper-grain { display: none; }
+
+  /* Safe-area insets for notched iPhones / home-indicator (viewport-fit=cover). */
+  .topbar { padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
+  .map-floating, .map-controls { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+  .toast { bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+  .panel-body { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .a2hs { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Very small / short screens: tighten the map/panel split so the list breathes. */
+@media (max-width: 380px) {
+  .a2hs-note { font-size: 11.5px; }
+}
+@media (max-height: 620px) and (max-width: 880px) {
+  .map-pane { flex: 0 0 56%; }
 }

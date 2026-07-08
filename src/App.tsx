@@ -15,14 +15,37 @@ import {
 } from "./lib/geo";
 import { maneuverLabel, type Route } from "./lib/routing";
 import { pathLength, poseAlong } from "./lib/sim";
+import { precacheTiles, tilesAlreadyCached } from "./lib/precache";
+import { detectInApp, type InAppInfo } from "./lib/inapp";
 
 type Tab = "explore" | "drives" | "about";
 type Source = "sim" | "gps";
+// A guest-friendly rendering of a GeolocationPositionError: a short headline plus
+// (for permission-denied) the exact per-OS steps to switch location back on.
+type GpsError = { title: string; detail: string; steps?: string[] };
+
+// The Chromium install prompt event (not in the TS DOM lib) + iOS Safari's
+// non-standard navigator.standalone, both used by the Add-to-Home-Screen hint.
+type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void> };
+type NavigatorStandalone = Navigator & { standalone?: boolean };
 
 const SPEED_MPS = 15; // simulated game-drive speed (~54 km/h peak on tracks)
+const ETA_MPS = 7;    // display-only ETA speed (~25 km/h — realistic on game-drive tracks)
+const GOOD_FIX_M = 50; // accuracy threshold: below this we treat the GPS fix as precise
 // A looping demo patrol through network nodes (see data/roadSource.ts). Each leg
 // is routed along the traced roads, so the demo dot drives the drawn tracks.
 const PATROL = ["gate", "j1", "jw", "j2", "j3", "j4", "naribo", "j5", "choroa", "j2", "j1", "gate"];
+
+// Guest mode (the QR / plain URL) is the default: real GPS, no simulator. Demo
+// mode (?demo) keeps the patrol dot + speed/detour controls for pitching and for
+// anyone exploring from home. Everything else (?tab, ?poi, ?nav, ?skipWelcome) is
+// unchanged. Read once at module load so it's stable for the whole session.
+const IS_DEMO =
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
+
+// Platform sniff for the per-OS "re-enable location" instructions (display only).
+const UA = typeof navigator === "undefined" ? "" : navigator.userAgent;
+const IS_IOS = /iPad|iPhone|iPod/.test(UA) || (/Macintosh/.test(UA) && typeof document !== "undefined" && "ontouchend" in document);
 
 export default function App() {
   const georef = useMemo(() => createGeoReference(), []);
@@ -48,7 +71,7 @@ export default function App() {
     const t = new URLSearchParams(window.location.search).get("tab");
     return t === "drives" || t === "about" ? t : "explore";
   });
-  const [source, setSource] = useState<Source>("sim");
+  const [source, setSource] = useState<Source>(IS_DEMO ? "sim" : "gps");
   // Start with the camera NOT chasing the demo dot, so the map is immediately
   // draggable on open. Following turns on when you drive (or tap ◎ Recentre).
   const [follow, setFollow] = useState(false);
@@ -77,10 +100,14 @@ export default function App() {
   const [mapLoaded, setMapLoaded] = useState(false); // gate the splash until the map is interactive
   const panelBodyRef = useRef<HTMLDivElement>(null);
 
-  // Live position + heading (from sim or device GPS).
-  const [user, setUser] = useState<LatLng | null>(() => poseAlong(patrolPath, 0).pos);
-  const [heading, setHeading] = useState<number | null>(() => poseAlong(patrolPath, 0).heading);
-  const [gpsError, setGpsError] = useState<string | null>(null);
+  // Live position + heading. Demo starts on the patrol dot; a guest starts with
+  // no position (null) until their first real GPS fix lands.
+  const [user, setUser] = useState<LatLng | null>(() => (IS_DEMO ? poseAlong(patrolPath, 0).pos : null));
+  const [heading, setHeading] = useState<number | null>(() => (IS_DEMO ? poseAlong(patrolPath, 0).heading : null));
+  // GPS state for the guest onboarding UX: a friendly error (denied/unavailable/
+  // timeout) and the latest fix accuracy in metres (null until the first fix).
+  const [gpsError, setGpsError] = useState<GpsError | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const userRef = useRef(user);
   userRef.current = user;
 
@@ -95,8 +122,42 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(
     () => typeof window === "undefined" || !new URLSearchParams(window.location.search).has("skipWelcome"),
   );
+  // In-app browser guard (§3.11): detect once; the guest can dismiss and browse
+  // online, but offline caching won't survive an in-app webview, so we warn.
+  const inAppInfo = useMemo<InAppInfo>(() => detectInApp(), []);
+  const [guardDismissed, setGuardDismissed] = useState(false);
+  const showGuard = inAppInfo.degraded && !guardDismissed;
+
+  // Add-to-Home-Screen hint (§3.4): installed PWAs get durable storage + one-tap
+  // launch. Android/Chrome fires beforeinstallprompt (native button); iOS needs a
+  // manual Share → Add to Home Screen, so we show instructions. Never in an
+  // already-installed (standalone) window, an in-app webview, or once dismissed.
+  const [installEvt, setInstallEvt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [a2hsDismissed, setA2hsDismissed] = useState(() => {
+    try { return localStorage.getItem("solio-a2hs-dismissed") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    const onBip = (e: Event) => { e.preventDefault(); setInstallEvt(e as BeforeInstallPromptEvent); };
+    window.addEventListener("beforeinstallprompt", onBip);
+    return () => window.removeEventListener("beforeinstallprompt", onBip);
+  }, []);
+  const isStandalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as NavigatorStandalone).standalone === true);
+  const showA2HS =
+    !a2hsDismissed && !isStandalone && !showGuard && !showWelcome && mapLoaded && !inAppInfo.inApp &&
+    (inAppInfo.platform === "ios" || !!installEvt);
+  function dismissA2HS() {
+    setA2hsDismissed(true);
+    try { localStorage.setItem("solio-a2hs-dismissed", "1"); } catch { /* ignore */ }
+  }
   const [toast, setToast] = useState<string | null>(null);
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+  // Offline precache progress: "saving" while pulling the pyramid, "saved" once
+  // the whole reserve is on the device. Drives the quiet status-chip messaging.
+  const [precache, setPrecache] = useState<{ state: "idle" | "saving" | "saved"; pct: number }>(
+    () => ({ state: tilesAlreadyCached() ? "saved" : "idle", pct: 0 }),
+  );
 
   // Failsafe: never let the loading splash outstay its welcome if the map's
   // "idle" event is slow (or never fires on a flaky tile fetch).
@@ -114,12 +175,26 @@ export default function App() {
     return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
   }, []);
 
-  // Auto-dismiss the arrival toast.
+  // Proactive offline precache — once the map is interactive and we're online,
+  // pull the whole tile pyramid into the SW cache so the reserve works in dead
+  // zones, not just where the guest happened to pan. Runs once per tile version
+  // (guarded by localStorage); needs a controlling service worker to be cached,
+  // so it's a no-op in dev where the SW is intentionally unregistered.
+  const precacheStarted = useRef(false);
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4200);
-    return () => clearTimeout(t);
-  }, [toast]);
+    if (precacheStarted.current || !mapLoaded || !online) return;
+    if (tilesAlreadyCached()) return;
+    if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
+    precacheStarted.current = true;
+    const ac = new AbortController();
+    setPrecache({ state: "saving", pct: 0 });
+    precacheTiles(
+      import.meta.env.BASE_URL,
+      ({ done, total }) => setPrecache({ state: done >= total ? "saved" : "saving", pct: total ? done / total : 0 }),
+      ac.signal,
+    ).catch(() => { precacheStarted.current = false; setPrecache({ state: "idle", pct: 0 }); });
+    return () => ac.abort();
+  }, [mapLoaded, online]);
 
   // Reset the panel scroll to the top whenever the tab changes.
   useEffect(() => { panelBodyRef.current?.scrollTo({ top: 0 }); }, [tab]);
@@ -211,25 +286,32 @@ export default function App() {
   }, [user, driving, destPoiId, activeRoute, network]);
 
   // ---- Device GPS ----------------------------------------------------------
+  // Held until the welcome is dismissed so the browser's permission prompt is a
+  // direct consequence of the guest's tap (primed = far better grant rates).
   useEffect(() => {
-    if (source !== "gps") return;
+    if (source !== "gps" || showWelcome) return;
     if (!("geolocation" in navigator)) {
-      setGpsError("This device has no geolocation support.");
+      setGpsError({
+        title: "This phone can't show your location",
+        detail: "Your device or browser doesn't support GPS on the web — you can still explore the map freely.",
+      });
       return;
     }
     setGpsError(null);
     const id = navigator.geolocation.watchPosition(
       (p) => {
+        setGpsError(null);
+        setAccuracy(typeof p.coords.accuracy === "number" ? p.coords.accuracy : null);
         setUser({ lat: p.coords.latitude, lng: p.coords.longitude });
         if (p.coords.heading != null && !Number.isNaN(p.coords.heading)) {
           setHeading(p.coords.heading);
         }
       },
-      (err) => setGpsError(err.message || "Location unavailable."),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 },
+      (err) => setGpsError(friendlyGpsError(err)),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, [source]);
+  }, [source, showWelcome]);
 
   const openPoi = openPoiId ? POIS.find((p) => p.id === openPoiId) ?? null : null;
 
@@ -310,6 +392,10 @@ export default function App() {
 
   // When using real GPS away from Solio, the user falls outside the map.
   const userOutside = source === "gps" && user != null && !georef.contains(user, MAP_MARGIN);
+  // Guest GPS onboarding states (display only — never change how position is used).
+  const liveGps = source === "gps" && !showWelcome;
+  const waitingForFix = liveGps && !gpsError && user == null;
+  const poorAccuracy = liveGps && user != null && accuracy != null && accuracy > GOOD_FIX_M;
 
   function navigateTo(p: Poi) {
     setDestPoiId(p.id);
@@ -427,15 +513,15 @@ export default function App() {
         <h1 className="pitch-title">Find your way<br />through the wild.</h1>
         <p className="pitch-lead">
           A companion app for Solio Game Reserve — guests see themselves on the
-          reserve's own map, navigate the tracks, and follow curated game
-          drives. Built to put conservation in every visitor's pocket.
+          reserve's own map and navigate the tracks. Built to put conservation
+          in every visitor's pocket.
         </p>
         <ul className="pitch-points">
           <li><span>◎</span><div><b>You-are-here</b><br />on Solio's own map, even offline.</div></li>
           <li><span>↱</span><div><b>Guided navigation</b><br />turn-by-turn along the reserve roads.</div></li>
-          <li><span>🧭</span><div><b>Self-guided drives</b><br />curated tours with commentary.</div></li>
+          <li><span>◈</span><div><b>Self-guided drives</b><br />guided reserve tours — coming soon.</div></li>
         </ul>
-        <div className="pitch-foot">Proof of concept · illustrative map &amp; data</div>
+        <div className="pitch-foot">Solio Game Reserve · the reserve's own map, in your pocket</div>
       </aside>
 
       <div className="device">
@@ -448,7 +534,18 @@ export default function App() {
             <div className="splash-note">Preparing the reserve map…</div>
           </div>
 
-          {showWelcome && <Welcome onStart={() => setShowWelcome(false)} />}
+          {showGuard && <InAppGuard info={inAppInfo} onDismiss={() => setGuardDismissed(true)} />}
+
+          {showA2HS && (
+            <A2HSHint
+              platform={inAppInfo.platform}
+              installEvt={installEvt}
+              onInstalled={() => setInstallEvt(null)}
+              onDismiss={dismissA2HS}
+            />
+          )}
+
+          {showWelcome && <Welcome isDemo={IS_DEMO} onStart={() => setShowWelcome(false)} />}
 
           <header className="topbar">
             <div className="brand">
@@ -459,9 +556,15 @@ export default function App() {
               </div>
             </div>
             <div className="topbar-actions">
-              <span className={`status-chip ${online ? "" : "off"}`}>
+              <span className={`status-chip ${online && precache.state !== "saved" ? "" : "off"}`}>
                 <i className="status-dot" />
-                {online ? "Online" : "Offline-ready"}
+                {precache.state === "saving"
+                  ? `Saving map… ${Math.round(precache.pct * 100)}%`
+                  : precache.state === "saved"
+                  ? "Map saved · works offline"
+                  : online
+                  ? "Online"
+                  : "Offline-ready"}
               </span>
             </div>
           </header>
@@ -519,7 +622,7 @@ export default function App() {
                   <>
                     <button className="btn" onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚" : "▶"}</button>
                     <button className="btn btn-ghost" onClick={simulateDetour} title="Demo: leave the road to see live re-routing">
-                      🔀 Detour
+                      Detour
                     </button>
                   </>
                 ) : (
@@ -533,9 +636,15 @@ export default function App() {
           {/* Outside-reserve notice (real GPS away from Solio) */}
           {userOutside && (
             <div className="outside-note">
-              <b>📍 You're outside Solio</b>
-              <span>Switch to “Demo drive” to explore the reserve.</span>
-              <button className="btn btn-accent sm" onClick={() => setSource("sim")}>Demo drive</button>
+              <b>You're outside Solio</b>
+              {IS_DEMO ? (
+                <>
+                  <span>Switch to “Demo drive” to explore the reserve.</span>
+                  <button className="btn btn-accent sm" onClick={() => setSource("sim")}>Demo drive</button>
+                </>
+              ) : (
+                <span>Your dot will appear here when you arrive. Meanwhile, explore the map.</span>
+              )}
             </div>
           )}
 
@@ -571,7 +680,7 @@ export default function App() {
             <div className="tour-card">
               <button className="pop-close" onClick={endTour} aria-label="End tour">×</button>
               <div className="tour-card-kicker">{tour.name} · Stop {tourStop + 1} of {tour.stops.length}</div>
-              <div className="tour-card-title">🧭 {currentStop.title}</div>
+              <div className="tour-card-title">{currentStop.title}</div>
               <div className="tour-card-note">{currentStop.commentary}</div>
               <div className="tour-card-actions">
                 <button className="btn btn-ghost sm" onClick={endTour}>End tour</button>
@@ -611,20 +720,40 @@ export default function App() {
 
           {/* Location source + status (only where the live map matters) */}
           {(tab === "explore" || tab === "drives") && (
-            <div className="status-row">
-              <div className="seg">
-                <button className={source === "sim" ? "on" : ""} onClick={() => setSource("sim")}>Demo drive</button>
-                <button className={source === "gps" ? "on" : ""} onClick={() => setSource("gps")}>Use my GPS</button>
-              </div>
-              {source === "sim" && (
-                <div className="seg small">
-                  <button className={playing ? "on" : ""} onClick={() => setPlaying((p) => !p)}>{playing ? "Pause" : "Play"}</button>
-                  <button className={speedMult === 3 ? "on" : ""} onClick={() => setSpeedMult((m) => (m === 1 ? 3 : 1))}>{speedMult}×</button>
+            IS_DEMO ? (
+              <div className="status-row">
+                <div className="seg">
+                  <button className={source === "sim" ? "on" : ""} onClick={() => setSource("sim")}>Demo drive</button>
+                  <button className={source === "gps" ? "on" : ""} onClick={() => setSource("gps")}>Use my GPS</button>
                 </div>
+                {source === "sim" && (
+                  <div className="seg small">
+                    <button className={playing ? "on" : ""} onClick={() => setPlaying((p) => !p)}>{playing ? "Pause" : "Play"}</button>
+                    <button className={speedMult === 3 ? "on" : ""} onClick={() => setSpeedMult((m) => (m === 1 ? 3 : 1))}>{speedMult}×</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Guest mode: a quiet live-GPS status line, no controls.
+              (waitingForFix || poorAccuracy) && (
+                <div className="gps-status">
+                  <i className="gps-status-dot" />
+                  {waitingForFix ? "Getting a precise fix…" : "Improving your GPS accuracy…"}
+                </div>
+              )
+            )
+          )}
+          {gpsError && (
+            <div className="gps-error">
+              <div className="gps-error-title">⚠ {gpsError.title}</div>
+              <div className="gps-error-detail">{gpsError.detail}</div>
+              {gpsError.steps && (
+                <ol className="gps-error-steps">
+                  {gpsError.steps.map((s, i) => <li key={i}>{s}</li>)}
+                </ol>
               )}
             </div>
           )}
-          {gpsError && <div className="warn">⚠ {gpsError}</div>}
 
           <div className="panel-body" ref={panelBodyRef}>
             {tab === "explore" && (
@@ -637,13 +766,20 @@ export default function App() {
               />
             )}
             {tab === "drives" && (
-              <DrivesTab
-                tours={TOURS}
-                activeTourId={tour?.id ?? null}
-                tourStop={tourStop}
-                onStart={startTour}
-                onEnd={endTour}
-              />
+              // Guest launch shows Coming Soon — real drives will be authored by
+              // Solio's guides (rhino-safe) and dropped in as data. The working
+              // tour engine stays available in the demo build for pitching.
+              IS_DEMO ? (
+                <DrivesTab
+                  tours={TOURS}
+                  activeTourId={tour?.id ?? null}
+                  tourStop={tourStop}
+                  onStart={startTour}
+                  onEnd={endTour}
+                />
+              ) : (
+                <DrivesComingSoon />
+              )
             )}
             {tab === "about" && <AboutTab cpCount={4} />}
           </div>
@@ -659,7 +795,7 @@ export default function App() {
 
 /* ---------------------------------------------------------------- Welcome */
 
-function Welcome(props: { onStart: () => void }) {
+function Welcome(props: { isDemo: boolean; onStart: () => void }) {
   return (
     <div className="welcome">
       <div className="welcome-card">
@@ -671,14 +807,122 @@ function Welcome(props: { onStart: () => void }) {
           Your companion for the reserve. See where you are on our map, find your
           way along the tracks, and discover the wildlife around you.
         </p>
-        <div className="welcome-stats">
-          <div><b>1970</b><span>First private rhino sanctuary</span></div>
-          <div><b>200+</b><span>Rhinos protected</span></div>
-          <div><b>45k</b><span>Acres of wilderness</span></div>
-        </div>
-        <button className="btn btn-accent block" onClick={props.onStart}>Enter the reserve →</button>
-        <div className="welcome-foot">Proof of concept · illustrative data</div>
+
+        {/* Plain-English safety notes — pending Callan's confirmation of wording. */}
+        <ul className="welcome-rules">
+          <li>Stay in your vehicle and keep to the tracks — no off-road driving.</li>
+          <li>Keep your distance from wildlife and drive slowly.</li>
+          <li>Reserve gate hours are 6:30 am – 5:00 pm.</li>
+          <li>Your location stays on your phone — nothing is sent anywhere.</li>
+        </ul>
+
+        {/* Location primer — the button tap is what triggers the permission prompt. */}
+        {!props.isDemo && (
+          <p className="welcome-primer">
+            To show you on the map, your phone will ask to share your location.
+            It stays on your device.
+          </p>
+        )}
+
+        <button className="btn btn-accent block" onClick={props.onStart}>
+          {props.isDemo ? "Explore the demo →" : "Show me on the map →"}
+        </button>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------- In-app browser guard */
+
+function InAppGuard(props: { info: InAppInfo; onDismiss: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const href = typeof window === "undefined" ? "" : window.location.href;
+
+  function openInBrowser() {
+    if (props.info.platform === "android") {
+      // Well-supported by Android in-app browsers — opens the default browser.
+      const u = new URL(href);
+      window.location.href = `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=https;end`;
+    } else {
+      // iOS has no reliable programmatic escape; x-safari- works in some apps and
+      // is patched in others — attempt it, the instruction text is the real path.
+      window.location.href = `x-safari-${href}`;
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* clipboard blocked — the on-screen link + instructions still work */
+    }
+  }
+
+  return (
+    <div className="guard">
+      <div className="guard-card">
+        <div className="guard-title">Open in your browser for the offline map</div>
+        <p className="guard-lead">
+          You've opened this inside another app. To save the reserve map so it works
+          with no phone signal, open it in your normal browser.
+        </p>
+        {props.info.platform === "ios" && (
+          <p className="guard-steps">
+            Tap the <b>•••</b> menu (usually top-right), then choose{" "}
+            <b>“Open in Safari”</b> or <b>“Open in external browser”</b>.
+          </p>
+        )}
+        <div className="guard-actions">
+          <button className="btn btn-accent sm" onClick={openInBrowser}>Open in browser</button>
+          <button className="btn btn-ghost-dark sm" onClick={copyLink}>
+            {copied ? "Link copied ✓" : "Copy link"}
+          </button>
+        </div>
+        <button className="guard-dismiss" onClick={props.onDismiss}>Continue here anyway</button>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------- Add to Home Screen */
+
+function A2HSHint(props: {
+  platform: InAppInfo["platform"];
+  installEvt: BeforeInstallPromptEvent | null;
+  onInstalled: () => void;
+  onDismiss: () => void;
+}) {
+  async function install() {
+    if (!props.installEvt) return;
+    try { await props.installEvt.prompt(); } catch { /* dismissed */ }
+    props.onInstalled();
+  }
+  const canPrompt = !!props.installEvt; // Android/Chrome
+  return (
+    <div className="a2hs">
+      <button className="a2hs-close" onClick={props.onDismiss} aria-label="Dismiss">×</button>
+      <div className="a2hs-body">
+        <img className="a2hs-mark" src={coverLogo} alt="" />
+        <div>
+          <div className="a2hs-title">Add Solio to your Home Screen</div>
+          {canPrompt ? (
+            <div className="a2hs-note">Install the map for one-tap access — and it stays saved for offline use.</div>
+          ) : (
+            <div className="a2hs-note">
+              Tap <span className="a2hs-share" aria-label="the Share icon">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 15V3M8 7l4-4 4 4" /><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" />
+                </svg>
+              </span> then <b>“Add to Home Screen”</b> — the map stays one tap away and saved offline.
+            </div>
+          )}
+        </div>
+      </div>
+      {canPrompt && (
+        <button className="btn btn-accent sm block" onClick={install}>Install the app</button>
+      )}
     </div>
   );
 }
@@ -784,6 +1028,23 @@ function DrivesTab(props: {
   );
 }
 
+/* Placeholder for the guest build until Solio's own guides author the drives. */
+function DrivesComingSoon() {
+  return (
+    <div className="list">
+      <div className="card coming-soon">
+        <div className="coming-soon-tag">Coming soon</div>
+        <div className="card-title">Self-guided game drives</div>
+        <div className="card-sub">
+          Curated drives along the reserve tracks, with commentary from Solio's
+          guides on what to look for and where. We're putting these together with
+          the team — check back soon.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ About */
 
 function AboutTab(props: { cpCount: number }) {
@@ -808,7 +1069,7 @@ function AboutTab(props: { cpCount: number }) {
       <ul>
         <li><b>You-are-here</b> on Solio's real map, online or offline.</li>
         <li><b>Navigation &amp; points of interest</b> — turn-by-turn along the reserve's drawn roads.</li>
-        <li><b>Self-guided drives</b> — curated tours with commentary along the tracks.</li>
+        <li><b>Self-guided drives</b> — guided reserve tours, coming soon.</li>
       </ul>
       <h3 className="danger">Rhino safety by design</h3>
       <p>
@@ -823,7 +1084,45 @@ function AboutTab(props: { cpCount: number }) {
 /* ---------------------------------------------------------------- helpers */
 
 function etaMinutes(meters: number): number {
-  return Math.max(1, Math.round(meters / SPEED_MPS / 60));
+  return Math.max(1, Math.round(meters / ETA_MPS / 60));
+}
+
+// Turn a raw GeolocationPositionError into friendly, actionable guest copy. The
+// denied case carries the exact re-enable steps for the guest's platform.
+function friendlyGpsError(err: GeolocationPositionError): GpsError {
+  switch (err.code) {
+    case err.PERMISSION_DENIED:
+      return {
+        title: "Location is switched off for this map",
+        detail: "To see yourself on the map, allow location and reload:",
+        steps: IS_IOS
+          ? [
+              "Open iPhone Settings → Privacy & Security → Location Services (make sure it's on)",
+              "Scroll to Safari Websites → set to “While Using the App”",
+              "Come back here and reload the page",
+            ]
+          : [
+              "Tap the padlock (or ⓘ) at the top of the browser address bar",
+              "Open Permissions → Location → set to Allow",
+              "Reload the page",
+            ],
+      };
+    case err.POSITION_UNAVAILABLE:
+      return {
+        title: "Can't get a location fix right now",
+        detail: "Your phone can't reach GPS at the moment — this often clears under open sky. The map still works while you wait.",
+      };
+    case err.TIMEOUT:
+      return {
+        title: "Still finding you…",
+        detail: "Getting a GPS fix is taking a while. Keep the app open under open sky — you can explore the map meanwhile.",
+      };
+    default:
+      return {
+        title: "Location unavailable",
+        detail: "We couldn't read your location, but you can still explore the map freely.",
+      };
+  }
 }
 
 function maneuverIcon(m?: string): string {
