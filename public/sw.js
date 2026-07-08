@@ -3,7 +3,7 @@
    shell for navigations. The basemap ships as raster tiles (tiles/{z}/{x}/{y}.jpg);
    they are same-origin, so the asset handler below caches each tile the first time
    it is viewed — visited areas then work offline. Bump CACHE on each release. */
-const CACHE = "solio-pwa-v5";
+const CACHE = "solio-pwa-v6";
 const ASSETS = [
   "./",
   "./index.html",
