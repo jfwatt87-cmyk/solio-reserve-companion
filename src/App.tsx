@@ -766,20 +766,15 @@ export default function App() {
               />
             )}
             {tab === "drives" && (
-              // Guest launch shows Coming Soon — real drives will be authored by
-              // Solio's guides (rhino-safe) and dropped in as data. The working
-              // tour engine stays available in the demo build for pitching.
-              IS_DEMO ? (
-                <DrivesTab
-                  tours={TOURS}
-                  activeTourId={tour?.id ?? null}
-                  tourStop={tourStop}
-                  onStart={startTour}
-                  onEnd={endTour}
-                />
-              ) : (
-                <DrivesComingSoon />
-              )
+              // Shows "Coming soon" while TOURS is empty. Real, Solio-authored
+              // rhino-safe drives drop into TOURS later as a pure data swap.
+              <DrivesTab
+                tours={TOURS}
+                activeTourId={tour?.id ?? null}
+                tourStop={tourStop}
+                onStart={startTour}
+                onEnd={endTour}
+              />
             )}
             {tab === "about" && <AboutTab cpCount={4} />}
           </div>
@@ -993,6 +988,7 @@ function DrivesTab(props: {
   onStart: (t: Tour) => void;
   onEnd: () => void;
 }) {
+  if (props.tours.length === 0) return <DrivesComingSoon />;
   return (
     <div className="list">
       <p className="hint">

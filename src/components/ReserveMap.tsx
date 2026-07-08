@@ -182,6 +182,18 @@ export function ReserveMap(props: Props) {
     map.keyboard.disable();
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: "metric" }), "bottom-left");
 
+    // Start the artist/illustration credit collapsed behind the ⓘ. MapLibre's
+    // compact attribution adds `maplibregl-compact-show` when the credit first
+    // populates (after the source loads), so collapse it once things settle;
+    // it won't be re-added, and the ⓘ still expands it on tap.
+    const collapseAttribution = () => {
+      map.getContainer()
+        .querySelector(".maplibregl-ctrl-attrib")
+        ?.classList.remove("maplibregl-compact-show");
+    };
+    map.on("load", collapseAttribution);
+    map.once("idle", collapseAttribution);
+
     // A user-initiated pan drops "follow" mode.
     map.on("dragstart", () => propsRef.current.onUserPan());
 
