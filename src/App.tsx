@@ -129,13 +129,12 @@ export default function App() {
   const showGuard = inAppInfo.degraded && !guardDismissed;
 
   // Add-to-Home-Screen hint (§3.4): installed PWAs get durable storage + one-tap
-  // launch. Android/Chrome fires beforeinstallprompt (native button); iOS needs a
-  // manual Share → Add to Home Screen, so we show instructions. Never in an
-  // already-installed (standalone) window, an in-app webview, or once dismissed.
+  // launch. Android/Chrome fires beforeinstallprompt (native button); iOS and
+  // prompt-less Android get per-platform manual steps. Shown on every fresh visit
+  // (dismissal is session-only, never persisted) but never in an already-installed
+  // (standalone) window or an in-app webview.
   const [installEvt, setInstallEvt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [a2hsDismissed, setA2hsDismissed] = useState(() => {
-    try { return localStorage.getItem("solio-a2hs-dismissed") === "1"; } catch { return false; }
-  });
+  const [a2hsDismissed, setA2hsDismissed] = useState(false);
   useEffect(() => {
     const onBip = (e: Event) => { e.preventDefault(); setInstallEvt(e as BeforeInstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", onBip);
@@ -146,10 +145,9 @@ export default function App() {
     (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as NavigatorStandalone).standalone === true);
   const showA2HS =
     !a2hsDismissed && !isStandalone && !showGuard && !showWelcome && mapLoaded && !inAppInfo.inApp &&
-    (inAppInfo.platform === "ios" || !!installEvt);
+    (inAppInfo.platform === "ios" || inAppInfo.platform === "android");
   function dismissA2HS() {
     setA2hsDismissed(true);
-    try { localStorage.setItem("solio-a2hs-dismissed", "1"); } catch { /* ignore */ }
   }
   const [toast, setToast] = useState<string | null>(null);
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
@@ -509,7 +507,7 @@ export default function App() {
     <div className="stage">
       <aside className="pitch">
         <img className="pitch-logo" src={coverLogo} alt="Solio Game Reserve" />
-        <div className="pitch-eyebrow">Solio Game Reserve · Companion concept</div>
+        <div className="pitch-eyebrow">Solio Game Reserve · Guest Companion</div>
         <h1 className="pitch-title">Find your way<br />through the wild.</h1>
         <p className="pitch-lead">
           A companion app for Solio Game Reserve — guests see themselves on the
@@ -904,13 +902,21 @@ function A2HSHint(props: {
           <div className="a2hs-title">Add Solio to your Home Screen</div>
           {canPrompt ? (
             <div className="a2hs-note">Install the map for one-tap access — and it stays saved for offline use.</div>
-          ) : (
+          ) : props.platform === "ios" ? (
             <div className="a2hs-note">
               Tap <span className="a2hs-share" aria-label="the Share icon">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 15V3M8 7l4-4 4 4" /><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" />
                 </svg>
               </span> then <b>“Add to Home Screen”</b> — the map stays one tap away and saved offline.
+            </div>
+          ) : (
+            <div className="a2hs-note">
+              Tap the <span className="a2hs-share" aria-label="the menu icon">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                  <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+                </svg>
+              </span> menu, then <b>“Add to Home screen”</b> — the map stays one tap away and saved offline.
             </div>
           )}
         </div>
