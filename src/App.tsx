@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ReserveMap } from "./components/ReserveMap";
 import coverLogo from "./assets/solio-logo.png";
 import { createGeoReference, pixelWorld, MAP_MARGIN } from "./data/reserve";
+import { insideReserveBuffered } from "./data/boundary";
 import { createRoadNetwork, NODE_PIXEL } from "./data/roadSource";
 import { POIS, poiWorld, type Poi } from "./data/pois";
 import { TOURS, type Tour } from "./data/tours";
@@ -13,9 +14,9 @@ import {
   formatDistance,
   type LatLng,
 } from "./lib/geo";
-import { maneuverLabel, type Route } from "./lib/routing";
+import { stepInstruction, type Route, type RouteStep } from "./lib/routing";
 import { pathLength, poseAlong } from "./lib/sim";
-import { precacheTiles, tilesAlreadyCached } from "./lib/precache";
+import { precacheTiles, tilesAlreadyCached, verifyTilesCached, invalidateTileCache, requestPersistentStorage } from "./lib/precache";
 import { detectInApp, type InAppInfo } from "./lib/inapp";
 
 type Tab = "explore" | "drives" | "about";
@@ -118,6 +119,8 @@ export default function App() {
   const [destPoiId, setDestPoiId] = useState<string | null>(
     () => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("nav")),
   );
+  // Mid-drive waypoints (POI ids, in order) visited before the destination.
+  const [stops, setStops] = useState<string[]>([]);
 
   const [showWelcome, setShowWelcome] = useState(
     () => typeof window === "undefined" || !new URLSearchParams(window.location.search).has("skipWelcome"),
@@ -150,12 +153,30 @@ export default function App() {
     setA2hsDismissed(true);
   }
   const [toast, setToast] = useState<string | null>(null);
+  // Transient notice when a live guest crosses the reserve boundary (buffered).
+  const [reserveAlert, setReserveAlert] = useState<string | null>(null);
+  const wasInReserve = useRef<boolean | null>(null);
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+  // Whether a service worker currently controls this page — a prerequisite for
+  // precaching. On a FIRST launch the SW registers, activates and claims the
+  // page only AFTER the initial load, so this starts false and flips true once
+  // control arrives (see the effect below), letting the save start on THIS open
+  // rather than requiring a second launch.
+  const [swControlled, setSwControlled] = useState(
+    () => typeof navigator !== "undefined" && !!navigator.serviceWorker?.controller,
+  );
   // Offline precache progress: "saving" while pulling the pyramid, "saved" once
   // the whole reserve is on the device. Drives the quiet status-chip messaging.
   const [precache, setPrecache] = useState<{ state: "idle" | "saving" | "saved"; pct: number }>(
     () => ({ state: tilesAlreadyCached() ? "saved" : "idle", pct: 0 }),
   );
+  // Briefly hold the download bar at 100% "saved" after a save we watched, so the
+  // completion is visible rather than the bar vanishing at the last percent.
+  const [justSaved, setJustSaved] = useState(false);
+  // Bumped when a launch-time integrity check finds the saved cache was evicted,
+  // to re-trigger the precache effect (a plain state change won't, since its
+  // deps are connectivity-only).
+  const [cacheNonce, setCacheNonce] = useState(0);
 
   // Failsafe: never let the loading splash outstay its welcome if the map's
   // "idle" event is slow (or never fires on a flaky tile fetch).
@@ -178,9 +199,27 @@ export default function App() {
   // zones, not just where the guest happened to pan. Runs once per tile version
   // (guarded by localStorage); needs a controlling service worker to be cached,
   // so it's a no-op in dev where the SW is intentionally unregistered.
+  // Watch for the service worker taking control (first launch claims the page
+  // asynchronously, after load), so the proactive precache below can start on
+  // this open instead of waiting for the next one.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    if (navigator.serviceWorker.controller) setSwControlled(true);
+    const onChange = () => setSwControlled(!!navigator.serviceWorker.controller);
+    navigator.serviceWorker.addEventListener("controllerchange", onChange);
+    // `ready` resolves once a worker is active — a backstop in case control
+    // arrived before this listener attached.
+    navigator.serviceWorker.ready
+      .then(() => { if (navigator.serviceWorker.controller) setSwControlled(true); })
+      .catch(() => {});
+    return () => navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+  }, []);
+
   const precacheStarted = useRef(false);
   useEffect(() => {
-    if (precacheStarted.current || !mapLoaded || !online) return;
+    // Not gated on mapLoaded: the tile pyramid is fetched directly, so the save
+    // can begin during the "preparing" splash rather than after the map shows.
+    if (precacheStarted.current || !online || !swControlled) return;
     if (tilesAlreadyCached()) return;
     if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) return;
     precacheStarted.current = true;
@@ -192,7 +231,67 @@ export default function App() {
       ac.signal,
     ).catch(() => { precacheStarted.current = false; setPrecache({ state: "idle", pct: 0 }); });
     return () => ac.abort();
-  }, [mapLoaded, online]);
+  }, [online, swControlled, cacheNonce]);
+
+  // Integrity guard for silent eviction. iOS can drop the tile cache under
+  // storage pressure while leaving the "saved" flag behind, so a returning guest
+  // could open the app in a dead zone believing the map is downloaded. On launch,
+  // verify the saved tiles still exist; if they don't, stop claiming "saved"
+  // (honest messaging) and re-pull whenever there's signal. Since iOS can't
+  // re-download in the background, every foreground open is our chance to heal.
+  useEffect(() => {
+    if (precache.state !== "saved") return;
+    let cancelled = false;
+    verifyTilesCached().then((ok) => {
+      if (cancelled || ok) return;
+      invalidateTileCache();
+      precacheStarted.current = false;
+      setPrecache({ state: "idle", pct: 0 });
+      setCacheNonce((n) => n + 1); // re-run the precache effect (deps changed)
+    });
+    return () => { cancelled = true; };
+    // once on launch — later state flips to "saved" are our own doing, not eviction
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ask for persistent storage (best-effort) — WebKit favours Home Screen apps
+  // and exempts persistent origins from eviction. Advisory; never blocks.
+  useEffect(() => {
+    requestPersistentStorage();
+  }, []);
+
+  // Flash "Map saved" on the download bar for a moment once a save we started
+  // this session completes (not when tiles were already cached on open).
+  useEffect(() => {
+    if (precache.state !== "saved" || !precacheStarted.current) return;
+    setJustSaved(true);
+    const t = setTimeout(() => setJustSaved(false), 3000);
+    return () => clearTimeout(t);
+  }, [precache.state]);
+
+  // Reveal the app (dismiss the "preparing" splash) once the map is interactive
+  // AND the offline save has SETTLED: saved, not possible now (offline), or never
+  // going to start (no controlling service worker). While a save is actively
+  // running we hold the splash so preparing genuinely includes the download; the
+  // Continue button and the failsafe below ensure a guest is never trapped.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (revealed || !mapLoaded) return;
+    if (precache.state === "saved" || !online) { setRevealed(true); return; }
+    if (precache.state === "idle") {
+      // no save has started shortly after the map is ready → none will (no SW)
+      const t = setTimeout(() => setRevealed(true), 6000);
+      return () => clearTimeout(t);
+    }
+    // precache.state === "saving": hold the splash until it saves (or the user
+    // taps Continue / the failsafe fires).
+  }, [revealed, mapLoaded, precache.state, online]);
+  // Failsafe: never hold the splash indefinitely on a slow or stuck save.
+  useEffect(() => {
+    if (!mapLoaded || revealed) return;
+    const t = setTimeout(() => setRevealed(true), 30000);
+    return () => clearTimeout(t);
+  }, [mapLoaded, revealed]);
 
   // Reset the panel scroll to the top whenever the tab changes.
   useEffect(() => { panelBodyRef.current?.scrollTo({ top: 0 }); }, [tab]);
@@ -239,6 +338,7 @@ export default function App() {
     }
     if (dest) setToast(`Arrived at ${dest.name}`);
     setDestPoiId(null);
+    setStops([]);
     setSimPath(patrolPath); // reset the demo patrol (harmless on GPS; ready if you switch back)
     setSimDist(0);
   }, [source, simDist, simPath, destPoiId, patrolPath, user, activeRoute]);
@@ -311,6 +411,25 @@ export default function App() {
     return () => navigator.geolocation.clearWatch(id);
   }, [source, showWelcome]);
 
+  // Notify once when a live guest crosses the reserve boundary (either way). The
+  // buffered test keeps a guest at a gate — which sits on the fence — "inside",
+  // and only a sustained crossing past the grace band flips the state, so GPS
+  // jitter at the edge doesn't flap the alert. Sim/demo drives never trigger it.
+  useEffect(() => {
+    if (source !== "gps" || showWelcome || !user) {
+      wasInReserve.current = null;
+      return;
+    }
+    const inside = insideReserveBuffered(user);
+    const prev = wasInReserve.current;
+    wasInReserve.current = inside;
+    if (prev === true && !inside) setReserveAlert("You're leaving Solio Game Reserve");
+    else if (prev === false && inside) setReserveAlert("Welcome back to Solio Game Reserve");
+  }, [user, source, showWelcome]);
+
+  // The boundary notice persists (it's a standing safety state) until the guest
+  // dismisses it or a new crossing replaces it — no auto-timeout.
+
   const openPoi = openPoiId ? POIS.find((p) => p.id === openPoiId) ?? null : null;
 
   const destPoi = destPoiId ? POIS.find((p) => p.id === destPoiId) ?? null : null;
@@ -324,16 +443,20 @@ export default function App() {
     const from = userRef.current;
     if (!dest || !from) return;
     const start = network.nearestNode(from);
-    const opts = network.alternatives(start.id, dest.nodeId, 3);
+    // With stops, offer the single via-route; without, offer alternatives.
+    const opts = stops.length
+      ? [multiStopRoute(start.id, [...stops, destPoiId])].filter((r): r is Route => !!r)
+      : network.alternatives(start.id, dest.nodeId, 3);
     if (!opts.length || opts[0].path.length < 2) {
       setToast(`You're already at ${dest.name}`);
       setDestPoiId(null);
+      setStops([]);
       setRouteOptions([]);
       return;
     }
     setRouteOptions(opts);
     setSelectedRouteIdx(0);
-  }, [destPoiId, driving, network]);
+  }, [destPoiId, driving, network, stops]);
 
   // The picked preview route, and the non-selected alternatives (drawn dimmed).
   const routePreview: Route | null = useMemo(
@@ -360,7 +483,9 @@ export default function App() {
       const step = activeRoute.steps[idx];
       const line = step.maneuver === "arrive"
         ? `Arrive at ${destPoi.name}`
-        : `${maneuverLabel[step.maneuver]} ${step.road}`.trim();
+        : step.maneuver === "stop"
+        ? `Stop at ${step.road}`
+        : stepInstruction(step.maneuver, step.road);
       return {
         mode: "driving" as const,
         icon: maneuverIcon(step.maneuver),
@@ -380,7 +505,7 @@ export default function App() {
       return {
         mode: "preview" as const,
         icon: maneuverIcon(first?.maneuver),
-        line: first ? `${maneuverLabel[first.maneuver]} ${first.road}`.trim() : "Start drive",
+        line: first ? stepInstruction(first.maneuver, first.road) : "Start drive",
         distToNext: null as number | null,
         remaining,
       };
@@ -404,6 +529,73 @@ export default function App() {
     // Preview the route(s) first; hold the demo dot still while you choose, then
     // ▶ Drive sets off. (The preview effect computes the options.)
     if (source === "sim") setPlaying(false);
+  }
+
+  // Route through an ordered list of POIs (waypoints then destination), joining
+  // the per-leg routes into one drive with a "Stop at …" step at each waypoint.
+  function multiStopRoute(fromNodeId: string, poiIds: string[]): Route | null {
+    const wps = poiIds.map((id) => POIS.find((p) => p.id === id)).filter((p): p is Poi => !!p);
+    if (!wps.length) return null;
+    const nodeSeq = [fromNodeId, ...wps.map((w) => w.nodeId)];
+    const legs: Route[] = [];
+    for (let i = 0; i < nodeSeq.length - 1; i++) {
+      const leg = network.route(nodeSeq[i], nodeSeq[i + 1]);
+      if (!leg || leg.path.length < 2) return null;
+      legs.push(leg);
+    }
+    const path = [...legs[0].path];
+    const nodeIds = [...legs[0].nodeIds];
+    const steps: RouteStep[] = [];
+    legs.forEach((leg, i) => {
+      if (i > 0) { path.push(...leg.path.slice(1)); nodeIds.push(...leg.nodeIds.slice(1)); }
+      if (i === legs.length - 1) {
+        steps.push(...leg.steps);
+      } else {
+        steps.push(...leg.steps.slice(0, -1)); // drop this leg's "arrive"
+        const at = leg.path[leg.path.length - 1];
+        steps.push({ maneuver: "stop", road: wps[i].name, roadClass: "graded", distanceM: 0, at });
+      }
+    });
+    return { nodeIds, path, steps, totalM: legs.reduce((s, l) => s + l.totalM, 0) };
+  }
+
+  // Apply a new stop order. Recomputes the live route from the current position
+  // when already driving; otherwise the preview effect rebuilds from `stops`.
+  function replan(next: string[]) {
+    setStops(next);
+    if (driving && user && destPoiId) {
+      const r = multiStopRoute(network.nearestNode(user).id, [...next, destPoiId]);
+      if (r && r.path.length >= 2) {
+        setActiveRoute(r);
+        setSimPath(r.path);
+        setSimDist(source === "gps" ? projectOnPath(user, r.path).along : 0);
+        if (source === "sim") setPlaying(true);
+      }
+    }
+  }
+  function addStop(id: string) {
+    if (!destPoiId || id === destPoiId || stops.includes(id)) return;
+    replan([...stops, id]);
+    setToast(`Stop added · ${POIS.find((p) => p.id === id)?.name ?? ""}`);
+  }
+  function removeStop(id: string) {
+    replan(stops.filter((s) => s !== id));
+  }
+  function moveStop(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= stops.length) return;
+    const next = [...stops];
+    [next[i], next[j]] = [next[j], next[i]];
+    replan(next);
+  }
+
+  // Replace the whole drive with a fresh destination (clearing any stops).
+  function startNewDrive(p: Poi) {
+    drivingNav.current = false;
+    setDriving(false);
+    setActiveRoute(null);
+    setStops([]);
+    navigateTo(p);
   }
   function simulateDetour() {
     // Demo: shove the dot ~130 m off the road so the live re-router kicks in.
@@ -438,6 +630,7 @@ export default function App() {
   function stopNav() {
     if (tour) { endTour(); return; }
     setDestPoiId(null);
+    setStops([]);
     drivingNav.current = false;
     setDriving(false);
     setActiveRoute(null);
@@ -475,6 +668,7 @@ export default function App() {
   }
   function startTour(t: Tour) {
     if (!user) { setToast("Waiting for your location…"); return; }
+    setStops([]); // a tour is its own itinerary — drop any custom waypoints
     setTour(t);
     setTab("drives");
     driveToStop(t, 0);
@@ -524,12 +718,42 @@ export default function App() {
 
       <div className="device">
         <div className="app">
-          {/* Loading gate — hold until the map is fully rendered + interactive. */}
-          <div className={`app-splash${mapLoaded ? " done" : ""}`} aria-hidden={mapLoaded}>
+          {/* Loading gate — hold until the map is interactive AND the offline map
+              has saved (or settled), so opening the app leads with the download. */}
+          <div className={`app-splash${revealed ? " done" : ""}`} aria-hidden={revealed}>
             <img className="splash-logo" src={coverLogo} alt="" />
             <div className="splash-title">Solio Game Reserve</div>
-            <div className="splash-spinner" />
-            <div className="splash-note">Preparing the reserve map…</div>
+            {precache.state === "saving" || justSaved ? (
+              <>
+                <div className="splash-dl">
+                  <div className="splash-dl-row">
+                    <span>{justSaved ? "Map saved" : "Saving the map for offline use"}</span>
+                    <span className="splash-dl-pct">
+                      {justSaved ? "✓" : `${Math.round(precache.pct * 100)}%`}
+                    </span>
+                  </div>
+                  <div className="map-dl-track">
+                    <div
+                      className={`map-dl-fill${justSaved ? " done" : ""}`}
+                      style={{ width: `${justSaved ? 100 : Math.round(precache.pct * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="splash-note">
+                  {justSaved ? "Ready to explore, even with no signal." : "So the reserve works with no phone signal."}
+                </div>
+                {mapLoaded && !justSaved && (
+                  <button className="splash-skip" onClick={() => setRevealed(true)}>
+                    Continue without waiting
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="splash-spinner" />
+                <div className="splash-note">Preparing the reserve map…</div>
+              </>
+            )}
           </div>
 
           {showGuard && <InAppGuard info={inAppInfo} onDismiss={() => setGuardDismissed(true)} />}
@@ -543,7 +767,15 @@ export default function App() {
             />
           )}
 
-          {showWelcome && <Welcome isDemo={IS_DEMO} onStart={() => setShowWelcome(false)} />}
+          {showWelcome && (
+            <Welcome
+              isDemo={IS_DEMO}
+              onStart={() => setShowWelcome(false)}
+              saveState={precache.state}
+              savePct={precache.pct}
+              online={online}
+            />
+          )}
 
           <header className="topbar">
             <div className="brand">
@@ -554,15 +786,19 @@ export default function App() {
               </div>
             </div>
             <div className="topbar-actions">
-              <span className={`status-chip ${online && precache.state !== "saved" ? "" : "off"}`}>
+              <span
+                className={`status-chip ${
+                  precache.state === "saved" ? "" : !online ? "warn" : "off"
+                }`}
+              >
                 <i className="status-dot" />
-                {precache.state === "saving"
-                  ? `Saving map… ${Math.round(precache.pct * 100)}%`
-                  : precache.state === "saved"
+                {precache.state === "saved"
                   ? "Map saved · works offline"
+                  : precache.state === "saving"
+                  ? `Saving map… ${Math.round(precache.pct * 100)}%`
                   : online
-                  ? "Online"
-                  : "Offline-ready"}
+                  ? "Map not saved yet"
+                  : "Map not saved · offline"}
               </span>
             </div>
           </header>
@@ -581,12 +817,47 @@ export default function App() {
             onLoaded={() => setMapLoaded(true)}
           />
 
+          {/* Danger case: offline with the map not fully saved. This is the exact
+              trap — a guest who left before the save finished, now in a dead zone.
+              Say so plainly rather than letting the map look complete. */}
+          {!online && precache.state !== "saved" && (
+            <div className="offline-warn" role="alert">
+              <b>⚠ Map not fully saved</b>
+              <span>
+                You're offline, so parts of the reserve may not load here. Reconnect to
+                WiFi or mobile data and wait for “Map saved” before heading out.
+              </span>
+            </div>
+          )}
+
+          {/* Offline map download progress — visible on first load while the
+              whole tile pyramid is pulled into the cache, so guests can see the
+              reserve is saving for offline use before they drive out of signal. */}
+          {(precache.state === "saving" || justSaved) && (
+            <div className="map-dl" role="status" aria-live="polite">
+              <div className="map-dl-row">
+                <span className="map-dl-label">
+                  {justSaved ? "Map saved · works offline" : "Downloading map for offline use"}
+                </span>
+                <span className="map-dl-pct">
+                  {justSaved ? "✓" : `${Math.round(precache.pct * 100)}%`}
+                </span>
+              </div>
+              <div className="map-dl-track">
+                <div
+                  className={`map-dl-fill${justSaved ? " done" : ""}`}
+                  style={{ width: `${justSaved ? 100 : Math.round(precache.pct * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Live navigation banner */}
           {destPoi && banner && (
             <div className="nav-banner">
               <div className="nav-step">
                 <div className="nav-maneuver">{banner.icon}</div>
-                <div>
+                <div className="nav-text">
                   <div className="nav-instruction">
                     {banner.distToNext != null && banner.distToNext > 60 && (
                       <span className="nav-in">In {formatDistance(banner.distToNext)} · </span>
@@ -595,9 +866,24 @@ export default function App() {
                   </div>
                   <div className="nav-meta">
                     To {destPoi.name} · {formatDistance(banner.remaining)} · ~{etaMinutes(banner.remaining)} min
+                    {" · arrive "}{arrivalClock(etaMinutes(banner.remaining))}
                   </div>
                 </div>
               </div>
+              {/* Stops — reorder (◀ ▶) or remove (✕); re-plans the route. */}
+              {stops.length > 0 && (
+                <div className="nav-stops">
+                  {stops.map((id, i) => (
+                    <div className="stop-chip" key={id}>
+                      <span className="stop-num">{i + 1}</span>
+                      <span className="stop-name">{POIS.find((p) => p.id === id)?.name ?? id}</span>
+                      <button className="stop-btn" disabled={i === 0} onClick={() => moveStop(i, -1)} aria-label="Move earlier">◀</button>
+                      <button className="stop-btn" disabled={i === stops.length - 1} onClick={() => moveStop(i, 1)} aria-label="Move later">▶</button>
+                      <button className="stop-btn" onClick={() => removeStop(id)} aria-label="Remove stop">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Route choices (before setting off) */}
               {!driving && routeOptions.length > 1 && (
                 <div className="nav-routes">
@@ -697,12 +983,29 @@ export default function App() {
               <div className="poi-pop-note">{openPoi.blurb}</div>
               <div className="poi-pop-actions">
                 {user && <span className="poi-pop-dist">{formatDistance(distanceMeters(user, poiWorld(openPoi)))} away</span>}
-                <button
-                  className="btn btn-accent sm"
-                  onClick={() => { const p = openPoi; setOpenPoiId(null); navigateTo(p); }}
-                >
-                  Navigate here
-                </button>
+                {destPoiId && destPoiId !== openPoi.id && !stops.includes(openPoi.id) ? (
+                  <>
+                    <button
+                      className="btn btn-ghost sm"
+                      onClick={() => { const id = openPoi.id; setOpenPoiId(null); addStop(id); }}
+                    >
+                      Add as stop
+                    </button>
+                    <button
+                      className="btn btn-accent sm"
+                      onClick={() => { const p = openPoi; setOpenPoiId(null); startNewDrive(p); }}
+                    >
+                      Start new drive
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn btn-accent sm"
+                    onClick={() => { const p = openPoi; setOpenPoiId(null); navigateTo(p); }}
+                  >
+                    Navigate here
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -780,6 +1083,12 @@ export default function App() {
           </main>
 
           {toast && <div className="toast" role="status" aria-live="polite">✓ {toast}</div>}
+          {reserveAlert && (
+            <div className="toast toast-warn" role="status" aria-live="polite">
+              <span>⚑ {reserveAlert}</span>
+              <button className="toast-dismiss" onClick={() => setReserveAlert(null)} aria-label="Dismiss">✕</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -788,7 +1097,13 @@ export default function App() {
 
 /* ---------------------------------------------------------------- Welcome */
 
-function Welcome(props: { isDemo: boolean; onStart: () => void }) {
+function Welcome(props: {
+  isDemo: boolean;
+  onStart: () => void;
+  saveState: "idle" | "saving" | "saved";
+  savePct: number;
+  online: boolean;
+}) {
   return (
     <div className="welcome">
       <div className="welcome-card">
@@ -808,6 +1123,36 @@ function Welcome(props: { isDemo: boolean; onStart: () => void }) {
           <li>Reserve gate hours are 6:30 am – 5:00 pm.</li>
           <li>Your location stays on your phone — nothing is sent anywhere.</li>
         </ul>
+
+        {/* Offline-save status, shown here (before "Show me on the map") so a
+            returning guest sees the map is ready — and the no-signal warning is
+            hidden once it's saved, since it no longer applies. */}
+        {props.saveState === "saved" ? (
+          <div className="welcome-save-ok">✓ Map saved — works offline</div>
+        ) : props.saveState === "saving" ? (
+          <div className="welcome-save-note">
+            <div className="welcome-save-row">
+              <span>Saving the map for offline use…</span>
+              <b>{Math.round(props.savePct * 100)}%</b>
+            </div>
+            <div className="map-dl-track">
+              <div className="map-dl-fill" style={{ width: `${Math.round(props.savePct * 100)}%` }} />
+            </div>
+            <span className="welcome-save-sub">
+              The reserve has little or no signal — keep this open until it finishes.
+            </span>
+          </div>
+        ) : props.online ? (
+          <p className="welcome-save-note">
+            The reserve has little or no phone signal. Keep this open on WiFi until it
+            says <b>“Map saved”</b> so the whole map works offline once you're inside.
+          </p>
+        ) : (
+          <p className="welcome-save-note warn">
+            You're offline and the map isn't saved yet. Connect to WiFi and wait for
+            <b> “Map saved”</b> before heading into the reserve.
+          </p>
+        )}
 
         {/* Location primer — the button tap is what triggers the permission prompt. */}
         {!props.isDemo && (
@@ -1089,6 +1434,13 @@ function etaMinutes(meters: number): number {
   return Math.max(1, Math.round(meters / ETA_MPS / 60));
 }
 
+/** Clock time of arrival, `minutes` from now (e.g. "2:32 pm" / "14:32" per locale). */
+function arrivalClock(minutes: number): string {
+  return new Date(Date.now() + minutes * 60_000)
+    .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    .toLowerCase();
+}
+
 // Turn a raw GeolocationPositionError into friendly, actionable guest copy. The
 // denied case carries the exact re-enable steps for the guest's platform.
 function friendlyGpsError(err: GeolocationPositionError): GpsError {
@@ -1134,6 +1486,7 @@ function maneuverIcon(m?: string): string {
     case "right": return "↱";
     case "slight-right": return "↗";
     case "arrive": return "◎";
+    case "stop": return "⚑";
     default: return "↑";
   }
 }

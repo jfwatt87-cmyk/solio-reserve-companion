@@ -31,6 +31,10 @@ export const IMAGE_HEIGHT = 3601;
 export const SHOW_POIS = true;
 export const SHOW_ROADS = false;
 export const SHOW_ROUTE = true;
+// The authoritative GIS reserve outline (data/boundary.ts). Off by default: the
+// poster already draws the boundary, and the true GPS edge differs from the
+// artwork's drawn edge by up to ~50 m, so overlaying it doubles the line.
+export const SHOW_BOUNDARY = false;
 
 /**
  * Pixel margin used when testing whether a GPS fix is "at Solio" — the artwork

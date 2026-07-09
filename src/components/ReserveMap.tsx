@@ -20,8 +20,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./reserve-map.css";
 import baseMeta from "../assets/solio-truenorth.json";
 import tilesMeta from "../assets/tiles-meta.json";
-import { SHOW_ROADS, SHOW_ROUTE, SHOW_POIS, pixelWorld } from "../data/reserve";
+import { SHOW_ROADS, SHOW_ROUTE, SHOW_POIS, SHOW_BOUNDARY, pixelWorld } from "../data/reserve";
 import { ROAD_GEOMS } from "../data/roadSource";
+import { RESERVE_BOUNDARY } from "../data/boundary";
 import { POIS, type Poi } from "../data/pois";
 import { type LatLng } from "../lib/geo";
 import type { Route } from "../lib/routing";
@@ -198,6 +199,18 @@ export function ReserveMap(props: Props) {
     map.on("dragstart", () => propsRef.current.onUserPan());
 
     map.on("load", () => {
+      // Authoritative GIS reserve outline, drawn UNDER everything else.
+      if (SHOW_BOUNDARY) {
+        map.addSource("boundary", { type: "geojson", data: boundaryFC() });
+        map.addLayer({
+          id: "boundary-line",
+          type: "line",
+          source: "boundary",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#7a3b2e", "line-opacity": 0.7, "line-width": 2, "line-dasharray": [3, 2] },
+        });
+      }
+
       // Alternative routes, drawn dimmed + dashed UNDER the active route.
       map.addSource("alt-routes", { type: "geojson", data: emptyFC() });
       map.addLayer({
@@ -215,14 +228,17 @@ export function ReserveMap(props: Props) {
         type: "line",
         source: "route",
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#1f3a2b", "line-opacity": 0.3, "line-width": 9 },
+        // Bright halo so the route reads over green forest/plains, not just tan tracks.
+        paint: { "line-color": "#ffffff", "line-opacity": 0.95, "line-width": 11 },
       });
       map.addLayer({
         id: "route-line",
         type: "line",
         source: "route",
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#3aa76d", "line-width": 5 },
+        // Warm high-contrast core — distinct from the blue "you are here" dot and
+        // the cool grey-blue alternatives.
+        paint: { "line-color": "#f2600c", "line-width": 6 },
       });
 
       // Road network (off unless real vectors arrive; the illustration draws its own).
@@ -457,6 +473,24 @@ function roadsFC(): GeoJSON.FeatureCollection {
         }),
       },
       properties: { name: r.name, type: r.type },
+    })),
+  };
+}
+
+/** Reserve boundary as GeoJSON (used only when SHOW_BOUNDARY). */
+function boundaryFC(): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: RESERVE_BOUNDARY.map((poly) => ({
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [poly.outer, ...poly.holes].map((ring) => {
+          const pts = ring.map((p) => toDisplay(p.lng, p.lat));
+          return [...pts, pts[0]]; // close the ring for drawing
+        }),
+      },
+      properties: {},
     })),
   };
 }

@@ -127,7 +127,14 @@ body {
   border: 3px solid rgba(244, 239, 230, 0.22); border-top-color: var(--ochre);
   animation: splash-spin 0.9s linear infinite; margin-top: 4px;
 }
-.splash-note { color: rgba(244, 239, 230, 0.6); font-size: 12.5px; letter-spacing: 0.3px; }
+.splash-note { color: rgba(244, 239, 230, 0.6); font-size: 12.5px; letter-spacing: 0.3px; text-align: center; padding: 0 24px; }
+/* Offline-save progress shown on the green splash — gold fill for contrast. */
+.splash-dl { width: min(280px, 74vw); display: flex; flex-direction: column; gap: 8px; }
+.splash-dl-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--bone); font-size: 13px; font-weight: 600; }
+.splash-dl-pct { color: var(--ochre); font-variant-numeric: tabular-nums; }
+.splash-dl .map-dl-track { background: rgba(244, 239, 230, 0.18); }
+.splash-dl .map-dl-fill { background: var(--ochre); }
+.splash-skip { margin-top: 2px; background: none; border: 0; color: rgba(244, 239, 230, 0.72); font-size: 12.5px; text-decoration: underline; cursor: pointer; padding: 6px 10px; }
 @keyframes splash-spin { to { transform: rotate(360deg); } }
 @keyframes splash-pulse { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.06); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
@@ -160,6 +167,8 @@ body {
 }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #7bd389; box-shadow: 0 0 0 3px rgba(123, 211, 137, 0.2); }
 .status-chip.off .status-dot { background: var(--ochre); box-shadow: 0 0 0 3px rgba(200, 147, 47, 0.2); }
+.status-chip.warn { background: rgba(166, 68, 46, 0.22); }
+.status-chip.warn .status-dot { background: var(--clay); box-shadow: 0 0 0 3px rgba(166, 68, 46, 0.25); }
 
 /* ---------------------------------------------------------------- Layout */
 .layout { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
@@ -218,7 +227,14 @@ body {
 .nav-step { order: 1; }
 .nav-actions { order: 2; }
 /* Route choices wrap onto their own row under the step + actions. */
-.nav-routes { order: 3; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+.nav-routes { order: 4; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+/* Stops itinerary — reorderable/removable chips on their own row. */
+.nav-stops { order: 3; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+.stop-chip { display: inline-flex; align-items: center; gap: 5px; background: rgba(244, 239, 230, 0.12); border-radius: 999px; padding: 3px 5px 3px 10px; font-size: 12px; }
+.stop-num { font-weight: 700; color: var(--ochre); }
+.stop-name { font-weight: 600; margin-right: 2px; }
+.stop-btn { background: rgba(244, 239, 230, 0.16); border: 0; color: var(--bone); width: 21px; height: 21px; border-radius: 50%; font-size: 10px; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.stop-btn:disabled { opacity: 0.32; cursor: default; }
 .route-chip {
   display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px;
   padding: 7px 11px; min-height: 40px; border-radius: 9px; cursor: pointer; line-height: 1.2;
@@ -231,8 +247,11 @@ body {
 @keyframes slide-down { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .nav-step { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .nav-maneuver { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; background: var(--ochre); color: var(--green); display: grid; place-items: center; font-size: 21px; font-weight: 700; }
-.nav-instruction { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nav-meta { font-size: 11.5px; opacity: 0.82; }
+/* Let the instruction shrink within the flex row and wrap (2 lines) rather than
+   truncate a destination name off the edge of the banner. */
+.nav-text { min-width: 0; flex: 1 1 auto; }
+.nav-instruction { font-weight: 700; font-size: 14px; line-height: 1.3; overflow-wrap: break-word; }
+.nav-meta { font-size: 11.5px; opacity: 0.82; line-height: 1.35; }
 .nav-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 
 /* ------------------------------------------------------------------ Tabs */
@@ -316,6 +335,26 @@ body {
 .welcome-rules li { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; line-height: 1.4; color: rgba(244, 239, 230, 0.82); }
 .welcome-rules li::before { content: ""; flex: 0 0 auto; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: var(--ochre); }
 .welcome-primer { font-size: 12.5px; line-height: 1.5; color: rgba(244, 239, 230, 0.7); margin: 0 0 18px; }
+.welcome-save-note {
+  font-size: 12.5px; line-height: 1.5; color: var(--bone);
+  background: rgba(200, 147, 47, 0.16); border: 1px solid rgba(200, 147, 47, 0.4);
+  border-radius: 10px; padding: 10px 12px; margin: 0 0 16px; text-align: left;
+}
+.welcome-save-note b { color: var(--ochre); }
+.welcome-save-note.warn { background: rgba(166, 68, 46, 0.2); border-color: rgba(166, 68, 46, 0.5); }
+.welcome-save-note.warn b { color: #f0b9ab; }
+.welcome-save-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+.welcome-save-row b { color: var(--ochre); font-variant-numeric: tabular-nums; }
+.welcome-save-note .map-dl-track { background: rgba(244, 239, 230, 0.18); }
+.welcome-save-note .map-dl-fill { background: var(--ochre); }
+.welcome-save-sub { display: block; margin-top: 8px; font-size: 11.5px; color: rgba(244, 239, 230, 0.7); }
+/* Positive confirmation shown on the welcome once the map is saved. */
+.welcome-save-ok {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: #bfe3c4;
+  background: rgba(123, 211, 137, 0.14); border: 1px solid rgba(123, 211, 137, 0.42);
+  border-radius: 999px; padding: 8px 16px; margin: 0 0 16px;
+}
 
 /* ------------------------------------------------------- Guest GPS status */
 .gps-status {
@@ -440,6 +479,35 @@ body {
   box-shadow: var(--shadow); animation: toast-in 0.3s ease; white-space: nowrap;
 }
 @keyframes toast-in { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+/* Boundary-crossing notice: clay (caution), sits above a green toast if both show. */
+.toast-warn { background: var(--clay); bottom: 68px; display: inline-flex; align-items: center; gap: 10px; }
+.toast-dismiss { background: rgba(244, 239, 230, 0.2); border: 0; color: var(--bone); width: 22px; height: 22px; border-radius: 50%; font-size: 11px; cursor: pointer; display: grid; place-items: center; padding: 0; flex: 0 0 auto; }
+
+/* Offline map download progress — a slim card near the top of the map. */
+.map-dl {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 14; width: min(340px, calc(100% - 28px));
+  background: var(--bone); color: var(--ink);
+  padding: 10px 13px 11px; border-radius: 12px; box-shadow: var(--shadow);
+  animation: toast-in 0.3s ease;
+}
+.map-dl-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+.map-dl-label { font-weight: 600; font-size: 13px; }
+.map-dl-pct { font-weight: 700; font-size: 13px; color: var(--green); font-variant-numeric: tabular-nums; }
+.map-dl-track { height: 6px; border-radius: 999px; background: rgba(43, 36, 23, 0.12); overflow: hidden; }
+.map-dl-fill { height: 100%; border-radius: 999px; background: var(--green); transition: width 0.35s ease; }
+.map-dl-fill.done { background: var(--green); }
+
+/* Offline + unsaved warning — the "you think it's downloaded but it isn't" trap. */
+.offline-warn {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 16; width: min(360px, calc(100% - 28px));
+  background: var(--clay); color: var(--bone);
+  padding: 11px 14px; border-radius: 12px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 3px; animation: toast-in 0.3s ease;
+}
+.offline-warn b { font-size: 13.5px; }
+.offline-warn span { font-size: 12.5px; line-height: 1.35; opacity: 0.95; }
 
 /* --------------------------------------------------------- Section heads */
 .section-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 2px 0; }
