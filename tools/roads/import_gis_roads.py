@@ -269,11 +269,19 @@ def main() -> None:
                     help="max metres from a POI to its network node (default 800)")
     ap.add_argument("--snap", type=float, default=SNAP_M,
                     help="metres within which two road endpoints are the same junction (default 25)")
+    ap.add_argument("--connectors", type=Path, action="append", default=[],
+                    help="extra GeoJSON of connector centrelines to node into the network "
+                         "(e.g. tools/roads/connectors.gpx.geojson — real tracks recovered from the "
+                         "GPX survey to bridge gaps the export left disconnected). Repeatable.")
     args = ap.parse_args()
 
     SNAP_M = args.snap
 
     lines = load_lines(args.geojson)
+    for cpath in args.connectors:
+        extra = load_lines(cpath)
+        print(f"  + {len(extra)} connector line(s) from {cpath.name}")
+        lines.extend(extra)
     nodes, edges = node_lines(lines)
     nodes, edges = keep_largest_component(nodes, edges)
     print(f"read {len(lines)} centreline(s) -> {len(nodes)} node(s), {len(edges)} edge(s)")
