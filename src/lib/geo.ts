@@ -100,6 +100,25 @@ export function pointToPathMeters(p: LatLng, path: LatLng[]): number {
   return projectOnPath(p, path).cross;
 }
 
+/**
+ * Point-in-polygon by ray casting (even-odd rule). `ring` is a closed or open
+ * list of vertices in lng/lat; the edge lng/lat are treated as planar, which is
+ * exact enough at reserve scale. Points exactly on an edge are not guaranteed a
+ * particular result — callers that care about the fence line should add a buffer.
+ */
+export function insidePolygon(p: LatLng, ring: LatLng[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const yi = ring[i].lat, xi = ring[i].lng;
+    const yj = ring[j].lat, xj = ring[j].lng;
+    const intersects =
+      yi > p.lat !== yj > p.lat &&
+      p.lng < ((xj - xi) * (p.lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 const COMPASS = [
   "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
   "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",

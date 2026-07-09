@@ -9,9 +9,12 @@ The app (src/data/roadSource.ts) prefers roads.gis.ts whenever it exists.
 
 POI binding: tours and navigation route to well-known node ids (gate, lodge,
 orphanage, airstrip, jw, kingfisher, yellowthorn, naribo, choroa, rhinogate).
-Each POI's verified position (from src/data/pois.ts) is matched to the nearest
-imported graph node (within --poi-radius metres, default 800) and that node
-adopts the POI's id, so existing tours keep routing unchanged.
+Each POI's verified position (from src/data/pois.ts) is projected onto the
+nearest imported road *edge* (within --poi-radius metres, default 800); the
+edge is split at that point and the new node adopts the POI's id, so a POI
+beside a through-road binds to the closest point on the road rather than to a
+possibly-distant junction. When the projection lands on an existing junction
+(within the snap tolerance) that junction adopts the id directly.
 
 Usage:
     python3 tools/roads/import_gis_roads.py <roads.geojson>
@@ -56,6 +59,81 @@ def world_to_pixel(lng: float, lat: float) -> tuple[float, float]:
 
 def dist_m(a: tuple[float, float], b: tuple[float, float]) -> float:
     return math.hypot((a[0] - b[0]) * M_PER_DEG_LNG, (a[1] - b[1]) * M_PER_DEG_LAT)
+
+
+def project_to_segment(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> tuple[float, tuple[float, float], float]:
+    """Project p onto segment a-b. Returns (t in [0,1], projection lng/lat,
+    perpendicular distance in metres). Local equirectangular metre frame — fine
+    at reserve scale."""
+    pax, pay = (a[0] - p[0]) * M_PER_DEG_LNG, (a[1] - p[1]) * M_PER_DEG_LAT
+    pbx, pby = (b[0] - p[0]) * M_PER_DEG_LNG, (b[1] - p[1]) * M_PER_DEG_LAT
+    dx, dy = pbx - pax, pby - pay
+    l2 = dx * dx + dy * dy
+    if l2 == 0.0:
+        return 0.0, a, math.hypot(pax, pay)
+    t = max(0.0, min(1.0, -(pax * dx + pay * dy) / l2))
+    cx, cy = pax + t * dx, pay + t * dy
+    proj = (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
+    return t, proj, math.hypot(cx, cy)
+
+
+def bind_pois_to_edges(
+    nodes: list[tuple[float, float]],
+    edges: list[dict],
+    pois: list[tuple[str, float, float]],
+    radius: float,
+) -> dict[int, str]:
+    """Bind each POI to the nearest point on the road network, splitting the
+    edge there when the point falls mid-segment. Mutates `nodes`/`edges` in
+    place (only appends nodes / splits edges — existing indices stay valid) and
+    returns {node_index: poi_id}. POIs farther than `radius` from any road warn
+    and are left unbound (routes to them will fail)."""
+    claimed: dict[int, str] = {}
+    for poi_id, lng, lat in pois:
+        p = (lng, lat)
+        best = None  # (dist_m, edge_index, seg_k, t, projection)
+        for ei, e in enumerate(edges):
+            pts = e["pts"]
+            for k in range(len(pts) - 1):
+                t, proj, d = project_to_segment(p, pts[k], pts[k + 1])
+                if best is None or d < best[0]:
+                    best = (d, ei, k, t, proj)
+        if best is None or best[0] > radius:
+            print(f"  WARNING: no road within {radius:.0f} m of POI '{poi_id}' — "
+                  "routes to it will fail until the network reaches it")
+            continue
+        d, ei, k, _t, proj = best
+        e = edges[ei]
+        na, nb = e["a"], e["b"]
+        snap = None
+        if dist_m(proj, nodes[na]) <= SNAP_M:
+            snap = na
+        elif dist_m(proj, nodes[nb]) <= SNAP_M:
+            snap = nb
+        # A snap onto a junction already owned by another POI would overwrite
+        # it — refuse: the nearest road only reaches an existing POI's node, so
+        # this POI is effectively unserved by the export.
+        if snap is not None and snap in claimed:
+            print(f"  WARNING: nearest road for POI '{poi_id}' ({d:.0f} m) is the "
+                  f"node already bound to '{claimed[snap]}' — leaving '{poi_id}' "
+                  "unbound (the export has no road of its own reaching it)")
+            continue
+        if snap is not None:
+            target = snap
+        else:
+            target = len(nodes)
+            nodes.append(proj)
+            pts = e["pts"]
+            left = pts[: k + 1] + [proj]
+            right = [proj] + pts[k + 1 :]
+            edges[ei] = {"a": na, "b": target, "name": e["name"], "surface": e["surface"], "pts": left}
+            edges.append({"a": target, "b": nb, "name": e["name"], "surface": e["surface"], "pts": right})
+        claimed[target] = poi_id
+        print(f"  poi '{poi_id}' -> node {target} ({d:.0f} m)"
+              + ("  [on junction]" if target in (na, nb) else "  [split edge]"))
+    return claimed
 
 
 def load_lines(path: Path) -> list[dict]:
@@ -125,6 +203,48 @@ def node_lines(lines: list[dict]) -> tuple[list[tuple[float, float]], list[dict]
     return nodes, edges
 
 
+def keep_largest_component(
+    nodes: list[tuple[float, float]], edges: list[dict]
+) -> tuple[list[tuple[float, float]], list[dict]]:
+    """Drop disconnected fragments so the routing graph is a single connected
+    network — a stray road stub that doesn't join the network can never be
+    navigated to/from, and a disjoint graph yields dead-end routes. Keeps the
+    largest component and reindexes; POIs then bind only to routable roads."""
+    adj: dict[int, list[int]] = {i: [] for i in range(len(nodes))}
+    for e in edges:
+        adj[e["a"]].append(e["b"])
+        adj[e["b"]].append(e["a"])
+    seen: set[int] = set()
+    best: set[int] = set()
+    for start in range(len(nodes)):
+        if start in seen:
+            continue
+        comp: set[int] = set()
+        stack = [start]
+        while stack:
+            u = stack.pop()
+            if u in comp:
+                continue
+            comp.add(u)
+            seen.add(u)
+            stack.extend(v for v in adj[u] if v not in comp)
+        if len(comp) > len(best):
+            best = comp
+    if len(best) == len(nodes):
+        return nodes, edges
+    keep = sorted(best)
+    remap = {old: i for i, old in enumerate(keep)}
+    new_nodes = [nodes[old] for old in keep]
+    new_edges = [
+        {**e, "a": remap[e["a"]], "b": remap[e["b"]]}
+        for e in edges
+        if e["a"] in remap and e["b"] in remap
+    ]
+    print(f"  pruned {len(nodes) - len(best)} node(s) in disconnected fragment(s) "
+          f"— kept the {len(best)}-node connected network")
+    return new_nodes, new_edges
+
+
 def load_pois() -> list[tuple[str, float, float]]:
     """(nodeId, lng, lat) for each POI, via the corner georeference."""
     src = (ROOT / "src/data/pois.ts").read_text()
@@ -150,22 +270,12 @@ def main() -> None:
 
     lines = load_lines(args.geojson)
     nodes, edges = node_lines(lines)
+    nodes, edges = keep_largest_component(nodes, edges)
     print(f"read {len(lines)} centreline(s) -> {len(nodes)} node(s), {len(edges)} edge(s)")
 
-    # bind POI ids to nearest nodes
-    ids = [f"g{i + 1}" for i in range(len(nodes))]
-    for poi_id, lng, lat in load_pois():
-        best, best_d = None, args.poi_radius
-        for i, n in enumerate(nodes):
-            d = dist_m((lng, lat), n)
-            if d < best_d and ids[i].startswith("g"):
-                best, best_d = i, d
-        if best is None:
-            print(f"  WARNING: no network node within {args.poi_radius:.0f} m of POI '{poi_id}' — "
-                  "routes to it will fail until the network reaches it")
-        else:
-            ids[best] = poi_id
-            print(f"  poi '{poi_id}' -> node {best} ({best_d:.0f} m)")
+    # bind POI ids onto the nearest road edge (splitting mid-segment as needed)
+    claimed = bind_pois_to_edges(nodes, edges, load_pois(), args.poi_radius)
+    ids = [claimed.get(i, f"g{i + 1}") for i in range(len(nodes))]
 
     def px(p: tuple[float, float]) -> str:
         x, y = world_to_pixel(*p)

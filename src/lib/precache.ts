@@ -19,10 +19,16 @@ type Manifest = { count: number; bytes: number; byZoom: Record<string, string[]>
 // Bump alongside sw.js CACHE when the tiles change, so phones re-pull the pyramid.
 export const TILE_CACHE_TAG = "solio-tiles-v4";
 
+const CACHED_KEY = "solio-tiles-cached";
+// A handful of tile URLs saved at cache-completion time so we can later verify,
+// even offline, that the Cache Storage entries still exist (iOS can evict them
+// under storage pressure while leaving this flag behind — see verifyTilesCached).
+const SAMPLE_KEY = "solio-tiles-sample";
+
 /** True once the full pyramid has been pulled for the current tile version. */
 export function tilesAlreadyCached(): boolean {
   try {
-    return localStorage.getItem("solio-tiles-cached") === TILE_CACHE_TAG;
+    return localStorage.getItem(CACHED_KEY) === TILE_CACHE_TAG;
   } catch {
     return false;
   }
@@ -30,9 +36,79 @@ export function tilesAlreadyCached(): boolean {
 
 function markCached() {
   try {
-    localStorage.setItem("solio-tiles-cached", TILE_CACHE_TAG);
+    localStorage.setItem(CACHED_KEY, TILE_CACHE_TAG);
   } catch {
     /* private mode / storage disabled — harmless, we just re-run next visit */
+  }
+}
+
+/** Forget the "saved" flag so the next check re-pulls the pyramid. */
+export function invalidateTileCache() {
+  try {
+    localStorage.removeItem(CACHED_KEY);
+    localStorage.removeItem(SAMPLE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+/** Persist a spread of tile URLs to probe later (low + high zoom). */
+function saveSample(urls: string[]) {
+  const n = Math.min(10, urls.length);
+  const step = Math.max(1, Math.floor(urls.length / n));
+  const sample: string[] = [];
+  for (let i = 0; i < urls.length && sample.length < n; i += step) sample.push(urls[i]);
+  // always include the very last (highest-zoom) tile — the first to be evicted
+  if (urls.length) sample[sample.length - 1] = urls[urls.length - 1];
+  try {
+    localStorage.setItem(SAMPLE_KEY, JSON.stringify(sample));
+  } catch {
+    /* storage disabled — verification just trusts the flag */
+  }
+}
+
+/**
+ * Confirm the saved tiles are STILL in Cache Storage. iOS may evict the cache
+ * under storage pressure without touching this localStorage flag, so a naive
+ * "saved" flag can lie. We probe a stored sample of tile URLs (works offline —
+ * Cache Storage is local). Returns true if the map can be trusted offline.
+ *
+ * Conservative: if we can't check (no Cache API / no sample / probe error) we
+ * return true rather than needlessly nuke a good cache.
+ */
+export async function verifyTilesCached(): Promise<boolean> {
+  if (!tilesAlreadyCached()) return false;
+  if (typeof caches === "undefined") return true;
+  let sample: string[] = [];
+  try {
+    sample = JSON.parse(localStorage.getItem(SAMPLE_KEY) || "[]");
+  } catch {
+    return true;
+  }
+  if (!Array.isArray(sample) || sample.length === 0) return true;
+  try {
+    for (const url of sample) {
+      const hit = await caches.match(url);
+      if (!hit) return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Ask the browser to mark this origin's storage persistent, which exempts it
+ * from eviction. WebKit grants this heuristically, favouring Home Screen web
+ * apps. Best-effort — the result is advisory, never block on it.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted?.()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
   }
 }
 
@@ -78,6 +154,7 @@ export async function precacheTiles(
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   if (!signal?.aborted) {
     onProgress({ done: total, total });
+    saveSample(urls);
     markCached();
   }
 }
