@@ -46,7 +46,7 @@ IW, IH = 2400, 3601
 M_PER_DEG_LAT = 111_320.0
 M_PER_DEG_LNG = 111_320.0 * math.cos(math.radians((LAT0 + LAT1) / 2))
 
-SNAP_M = 25.0          # endpoints closer than this are the same junction
+SNAP_M = 25.0          # endpoints closer than this are the same junction (overridable via --snap)
 SURFACES = {"graded", "dirt", "4x4"}
 
 
@@ -261,12 +261,17 @@ def load_pois() -> list[tuple[str, float, float]]:
 
 
 def main() -> None:
+    global SNAP_M
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("geojson", type=Path)
     ap.add_argument("--out", type=Path, default=ROOT / "src/data/roads.gis.ts")
     ap.add_argument("--poi-radius", type=float, default=800.0,
                     help="max metres from a POI to its network node (default 800)")
+    ap.add_argument("--snap", type=float, default=SNAP_M,
+                    help="metres within which two road endpoints are the same junction (default 25)")
     args = ap.parse_args()
+
+    SNAP_M = args.snap
 
     lines = load_lines(args.geojson)
     nodes, edges = node_lines(lines)
