@@ -36,6 +36,16 @@ export const SHOW_ROUTE = true;
 // artwork's drawn edge by up to ~50 m, so overlaying it doubles the line.
 export const SHOW_BOUNDARY = false;
 
+// Turn-by-turn navigation (route preview + drive mode + nav banner). OFF for the
+// Phase 1 launch (2026-07-09, at Callan's request): the routing faithfully follows
+// the roads in the GIS export, but that export's interior tracks and — especially —
+// river/bridge crossings aren't fully connected, so A* is forced onto perimeter/
+// fence-line roads and sends guests the long way. All the routing code stays in the
+// build; flip this back to `true` once Callan's roads layer is repaired (bridges
+// noded, lodge access tracks added) and routes verify as direct. The robust parts
+// (live map, GPS dot, drawn roads, tap-a-place for distance) are unaffected.
+export const NAV_ENABLED = false;
+
 /**
  * Pixel margin used when testing whether a GPS fix is "at Solio" — the artwork
  * draws surrounding landscape beyond the reserve, so allow a generous border.

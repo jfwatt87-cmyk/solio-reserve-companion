@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ReserveMap } from "./components/ReserveMap";
 import coverLogo from "./assets/solio-logo.png";
-import { createGeoReference, pixelWorld, MAP_MARGIN } from "./data/reserve";
+import { createGeoReference, pixelWorld, MAP_MARGIN, NAV_ENABLED } from "./data/reserve";
 import { insideReserveBuffered } from "./data/boundary";
 import { createRoadNetwork, NODE_PIXEL } from "./data/roadSource";
 import { POIS, poiWorld, type Poi } from "./data/pois";
@@ -432,6 +432,17 @@ export default function App() {
 
   const openPoi = openPoiId ? POIS.find((p) => p.id === openPoiId) ?? null : null;
 
+  // In full-screen map mode the place popup and the toast both sit at the bottom
+  // of the screen, so a toast would land on top of the popup's buttons. Measure
+  // the open popup and lift the toast(s) to sit clear above it. (In windowed mode
+  // the panel separates them, so no lift is needed.)
+  const poiPopRef = useRef<HTMLDivElement | null>(null);
+  const [popH, setPopH] = useState(0);
+  useLayoutEffect(() => {
+    setPopH(openPoiId && poiPopRef.current ? poiPopRef.current.offsetHeight : 0);
+  }, [openPoiId, Boolean(user), destPoiId, stops]);
+  const toastLift = mapFull && popH ? popH + 24 : 0;
+
   const destPoi = destPoiId ? POIS.find((p) => p.id === destPoiId) ?? null : null;
 
   // Compute the route choices when a destination is picked (before driving).
@@ -521,6 +532,7 @@ export default function App() {
   const poorAccuracy = liveGps && user != null && accuracy != null && accuracy > GOOD_FIX_M;
 
   function navigateTo(p: Poi) {
+    if (!NAV_ENABLED) return; // navigation held for Phase 1 — see reserve.ts NAV_ENABLED
     setDestPoiId(p.id);
     setSelectedPoiId(p.id);
     setTab("explore");
@@ -853,7 +865,7 @@ export default function App() {
           )}
 
           {/* Live navigation banner */}
-          {destPoi && banner && (
+          {NAV_ENABLED && destPoi && banner && (
             <div className="nav-banner">
               <div className="nav-step">
                 <div className="nav-maneuver">{banner.icon}</div>
@@ -977,36 +989,41 @@ export default function App() {
 
           {/* Place info popup */}
           {openPoi && (
-            <div className="poi-pop">
+            <div className="poi-pop" ref={poiPopRef}>
               <button className="pop-close dark" onClick={() => setOpenPoiId(null)} aria-label="Close">×</button>
               <div className="poi-pop-title">{openPoi.name}</div>
               <div className="poi-pop-note">{openPoi.blurb}</div>
-              <div className="poi-pop-actions">
-                {user && <span className="poi-pop-dist">{formatDistance(distanceMeters(user, poiWorld(openPoi)))} away</span>}
-                {destPoiId && destPoiId !== openPoi.id && !stops.includes(openPoi.id) ? (
-                  <>
-                    <button
-                      className="btn btn-ghost sm"
-                      onClick={() => { const id = openPoi.id; setOpenPoiId(null); addStop(id); }}
-                    >
-                      Add as stop
-                    </button>
-                    <button
-                      className="btn btn-accent sm"
-                      onClick={() => { const p = openPoi; setOpenPoiId(null); startNewDrive(p); }}
-                    >
-                      Start new drive
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="btn btn-accent sm"
-                    onClick={() => { const p = openPoi; setOpenPoiId(null); navigateTo(p); }}
-                  >
-                    Navigate here
-                  </button>
-                )}
-              </div>
+              {/* Distance is always shown; the navigate/drive actions are held for
+                  Phase 1 (NAV_ENABLED) — see reserve.ts. */}
+              {(user || NAV_ENABLED) && (
+                <div className="poi-pop-actions">
+                  {user && <span className="poi-pop-dist">{formatDistance(distanceMeters(user, poiWorld(openPoi)))} away</span>}
+                  {NAV_ENABLED &&
+                    (destPoiId && destPoiId !== openPoi.id && !stops.includes(openPoi.id) ? (
+                      <>
+                        <button
+                          className="btn btn-ghost sm"
+                          onClick={() => { const id = openPoi.id; setOpenPoiId(null); addStop(id); }}
+                        >
+                          Add as stop
+                        </button>
+                        <button
+                          className="btn btn-accent sm"
+                          onClick={() => { const p = openPoi; setOpenPoiId(null); startNewDrive(p); }}
+                        >
+                          Start new drive
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="btn btn-accent sm"
+                        onClick={() => { const p = openPoi; setOpenPoiId(null); navigateTo(p); }}
+                      >
+                        Navigate here
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1082,9 +1099,23 @@ export default function App() {
         </aside>
           </main>
 
-          {toast && <div className="toast" role="status" aria-live="polite">✓ {toast}</div>}
+          {toast && (
+            <div
+              className="toast"
+              style={toastLift ? { bottom: toastLift } : undefined}
+              role="status"
+              aria-live="polite"
+            >
+              ✓ {toast}
+            </div>
+          )}
           {reserveAlert && (
-            <div className="toast toast-warn" role="status" aria-live="polite">
+            <div
+              className="toast toast-warn"
+              style={toastLift ? { bottom: toastLift + 46 } : undefined}
+              role="status"
+              aria-live="polite"
+            >
               <span>⚑ {reserveAlert}</span>
               <button className="toast-dismiss" onClick={() => setReserveAlert(null)} aria-label="Dismiss">✕</button>
             </div>
@@ -1295,7 +1326,11 @@ function ExploreTab(props: {
       <div className="section-head">
         <span>Places</span>
       </div>
-      <p className="hint">Tap a place to see it, or navigate there along the reserve tracks.</p>
+      <p className="hint">
+        {NAV_ENABLED
+          ? "Tap a place to see it, or navigate there along the reserve tracks."
+          : "Tap a place to see it on the map."}
+      </p>
       {list.map(({ poi, dist }) => (
         <div
           key={poi.id}
@@ -1317,12 +1352,14 @@ function ExploreTab(props: {
           </div>
           <div className="card-side">
             {props.user && <div className="dist">{formatDistance(dist)}</div>}
-            <button
-              className="btn btn-accent sm"
-              onClick={(e) => { e.stopPropagation(); props.onNavigate(poi); }}
-            >
-              Navigate
-            </button>
+            {NAV_ENABLED && (
+              <button
+                className="btn btn-accent sm"
+                onClick={(e) => { e.stopPropagation(); props.onNavigate(poi); }}
+              >
+                Navigate
+              </button>
+            )}
           </div>
         </div>
       ))}
