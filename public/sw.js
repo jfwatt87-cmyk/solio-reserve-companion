@@ -1,11 +1,19 @@
 /* Solio Reserve Companion — offline service worker.
-   Precache the app shell and serve it cache-first, falling back to the cached
-   shell for navigations. The basemap ships as raster tiles (tiles/{z}/{x}/{y}.jpg);
-   they are same-origin, so the asset handler below caches each tile the first time
-   it is viewed — visited areas then work offline. Bump CACHE on each release. */
-const CACHE = "solio-pwa-v7";
-const ASSETS = [
-  "./",
+
+   TWO caches with independent lifetimes:
+   - SHELL_CACHE: the app itself (index.html, manifest, icons). Bump per release.
+   - TILE_CACHE:  the ~12 MB basemap tile pyramid + tiles-manifest.json. Bump ONLY
+     when the tile pyramid itself changes. Must equal TILE_CACHE_TAG in
+     src/lib/precache.ts — the prebuild step (tools/gen-tile-manifest.mjs) fails
+     the build if they ever diverge.
+
+   Why split: bumping the shell version must never wipe a guest's saved map.
+   activate only deletes caches that belong to neither name, so a shell release
+   leaves the tiles untouched, and a tile release (both bumped) re-pulls cleanly. */
+const SHELL_CACHE = "solio-shell-v8";
+const TILE_CACHE = "solio-tiles-v4";
+
+const SHELL_ASSETS = [
   "./index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
@@ -13,11 +21,14 @@ const ASSETS = [
   "./apple-touch-icon.png",
 ];
 
+const isTile = (url) => url.pathname.includes("/tiles/");
+const isManifest = (url) => url.pathname.endsWith("/tiles-manifest.json");
+
 self.addEventListener("install", (e) => {
   e.waitUntil(
     (async () => {
-      const cache = await caches.open(CACHE);
-      await cache.addAll(ASSETS);
+      const cache = await caches.open(SHELL_CACHE);
+      await cache.addAll(SHELL_ASSETS);
       await self.skipWaiting();
     })(),
   );
@@ -26,7 +37,11 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(
+          keys.filter((k) => k !== SHELL_CACHE && k !== TILE_CACHE).map((k) => caches.delete(k)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
@@ -34,6 +49,9 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
   // Navigations: network first (fresh releases), cached app shell when offline.
   if (req.mode === "navigate") {
     e.respondWith(
@@ -41,7 +59,7 @@ self.addEventListener("fetch", (e) => {
         .then((resp) => {
           if (resp.ok) {
             const copy = resp.clone();
-            caches.open(CACHE).then((c) => c.put("./index.html", copy));
+            caches.open(SHELL_CACHE).then((c) => c.put("./index.html", copy));
           }
           return resp;
         })
@@ -49,14 +67,55 @@ self.addEventListener("fetch", (e) => {
     );
     return;
   }
-  // Same-origin assets: cache-first, then network (and cache it).
+
+  // tiles-manifest.json: network first so a tile release is seen immediately,
+  // falling back to the cached copy offline. Never let an HTML error page in.
+  if (isManifest(url)) {
+    e.respondWith(
+      fetch(req)
+        .then((resp) => {
+          if (resp.ok && (resp.headers.get("content-type") || "").includes("json")) {
+            const copy = resp.clone();
+            caches.open(TILE_CACHE).then((c) => c.put(req, copy));
+            return resp;
+          }
+          return caches.match(req).then((r) => r || resp);
+        })
+        .catch(() => caches.match(req)),
+    );
+    return;
+  }
+
+  // Tiles: cache-first (the precache loop fills TILE_CACHE; panning tops it up).
+  // Guard content-type so an SPA-fallback HTML page can never be cached as a tile.
+  if (isTile(url)) {
+    e.respondWith(
+      caches.match(req).then(
+        (cached) =>
+          cached ||
+          fetch(req).then((resp) => {
+            const type = resp.headers.get("content-type") || "";
+            if (resp.ok && resp.type === "basic" && type.startsWith("image/")) {
+              const copy = resp.clone();
+              caches.open(TILE_CACHE).then((c) => c.put(req, copy));
+            }
+            return resp;
+          }),
+      ),
+    );
+    return;
+  }
+
+  // Other same-origin assets: cache-first into the shell cache. Never cache an
+  // HTML body under a non-navigation URL (that's an error/SPA-fallback page).
   e.respondWith(
     caches.match(req).then((cached) =>
       cached ||
       fetch(req).then((resp) => {
-        if (resp.ok && resp.type === "basic") {
+        const type = resp.headers.get("content-type") || "";
+        if (resp.ok && resp.type === "basic" && !type.includes("text/html")) {
           const copy = resp.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          caches.open(SHELL_CACHE).then((c) => c.put(req, copy));
         }
         return resp;
       }).catch(() => cached),

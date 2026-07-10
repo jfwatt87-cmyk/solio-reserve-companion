@@ -1,0 +1,115 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "",
+    "surface": "dirt",
+    "source": "gpx_confirmed",
+    "fix": "g83-g92"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.93687,
+      -0.15487
+     ],
+     [
+      36.936855,
+      -0.154745
+     ],
+     [
+      36.936738,
+      -0.154624
+     ],
+     [
+      36.93669,
+      -0.1546
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "",
+    "surface": "dirt",
+    "source": "gpx_confirmed",
+    "fix": "g52-g84"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.89102,
+      -0.16698
+     ],
+     [
+      36.890883,
+      -0.166725
+     ],
+     [
+      36.890948,
+      -0.16662
+     ],
+     [
+      36.891046,
+      -0.16657
+     ],
+     [
+      36.890908,
+      -0.166578
+     ],
+     [
+      36.891103,
+      -0.166503
+     ],
+     [
+      36.890865,
+      -0.165775
+     ],
+     [
+      36.890721,
+      -0.165748
+     ],
+     [
+      36.890583,
+      -0.16571
+     ],
+     [
+      36.890756,
+      -0.165626
+     ],
+     [
+      36.89059,
+      -0.16562
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "",
+    "surface": "dirt",
+    "source": "gpx_confirmed",
+    "fix": "g35-g50"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.94838,
+      -0.17961
+     ],
+     [
+      36.94844,
+      -0.17939
+     ]
+    ]
+   }
+  }
+ ]
+}
