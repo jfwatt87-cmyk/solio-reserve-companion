@@ -63,5 +63,5 @@ project are fine too. Partial is fine; roads first if you have to choose.
 
 ## Reaching me
 
-James Watt — **[email removed — contact via WhatsApp]** (or WhatsApp as usual).
+James Watt — WhatsApp, as usual.
 Questions, ideas, something on the map in the wrong place — just shout.
