@@ -33,6 +33,7 @@ if (!swTag || !tsTag || swTag !== tsTag) {
 const byZoom = {};
 let count = 0;
 let bytes = 0;
+const byteHash = createHash("sha256");
 
 for (const z of readdirSync(tilesDir).sort((a, b) => Number(a) - Number(b))) {
   const zDir = join(tilesDir, z);
@@ -51,10 +52,42 @@ for (const z of readdirSync(tilesDir).sort((a, b) => Number(a) - Number(b))) {
   if (urls.length) byZoom[z] = urls.sort();
 }
 
+// Hash the tile BYTES (in stable path order), not just the path list — an
+// in-place JPEG edit must change the digest (audit 2026-07-10).
+for (const z of Object.keys(byZoom)) {
+  for (const u of byZoom[z]) {
+    byteHash.update(u);
+    byteHash.update(readFileSync(join(root, "public", u)));
+  }
+}
+
 // Deterministic "generated" stamp: a hash of the content, not a timestamp, so
 // two builds of the same tiles produce byte-identical manifests (lets the
 // release runbook hash-compare the Cloudflare and GitHub Pages artifacts).
-const digest = createHash("sha256").update(JSON.stringify(byZoom)).digest("hex").slice(0, 12);
+const digest = byteHash.digest("hex").slice(0, 12);
+
+/* Guard 2: tile bytes must not change without a TILE_CACHE bump — cache-first
+ * clients would serve stale tiles forever. tools/tiles.lock.json records the
+ * (tag, digest) pair of the last build; commit it whenever it changes. */
+const lockPath = join(root, "tools", "tiles.lock.json");
+let lock = null;
+try {
+  lock = JSON.parse(readFileSync(lockPath, "utf8"));
+} catch {
+  /* first run — lock written below */
+}
+if (lock && lock.digest !== digest && lock.tag === swTag) {
+  console.error(
+    `[tile-manifest] FATAL: tile bytes changed (digest ${lock.digest} -> ${digest}) but TILE_CACHE is still "${swTag}". ` +
+      `Bump TILE_CACHE (sw.js) AND TILE_CACHE_TAG (precache.ts) so phones re-pull the pyramid.`,
+  );
+  process.exit(1);
+}
+if (!lock || lock.digest !== digest || lock.tag !== swTag) {
+  writeFileSync(lockPath, JSON.stringify({ tag: swTag, digest }) + "\n");
+  console.log(`[tile-manifest] tiles.lock.json updated (${swTag} / ${digest}) — commit it.`);
+}
+
 const manifest = { generated: digest, count, bytes, byZoom };
 const out = join(root, "public", "tiles-manifest.json");
 writeFileSync(out, JSON.stringify(manifest));

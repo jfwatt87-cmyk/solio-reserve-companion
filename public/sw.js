@@ -1,17 +1,24 @@
 /* Solio Reserve Companion — offline service worker.
 
-   TWO caches with independent lifetimes:
+   TWO cache families with independent lifetimes:
    - SHELL_CACHE: the app itself (index.html, manifest, icons). Bump per release.
    - TILE_CACHE:  the ~12 MB basemap tile pyramid + tiles-manifest.json. Bump ONLY
      when the tile pyramid itself changes. Must equal TILE_CACHE_TAG in
      src/lib/precache.ts — the prebuild step (tools/gen-tile-manifest.mjs) fails
-     the build if they ever diverge.
+     the build if they ever diverge, and fails if tile bytes change without a bump.
 
-   Why split: bumping the shell version must never wipe a guest's saved map.
-   activate only deletes caches that belong to neither name, so a shell release
-   leaves the tiles untouched, and a tile release (both bumped) re-pulls cleanly. */
-const SHELL_CACHE = "solio-shell-v9";
+   Staged tile upgrades (audit 2026-07-10): activate NEVER deletes an old
+   solio-tiles-* cache — a guest's known-good map must survive until the new
+   pyramid is fully downloaded and verified. Old tile caches are retired by
+   precache.ts AFTER it marks the new version saved. Tile reads fall back to
+   older tile caches so the map keeps working mid-upgrade.
+
+   Redirect hygiene: Cloudflare 308s ./index.html -> ./ ; a stored *redirected*
+   response is rejected when replayed for a navigation, so every cached
+   navigation response is normalised (re-wrapped) before it enters the cache. */
+const SHELL_CACHE = "solio-shell-v10";
 const TILE_CACHE = "solio-tiles-v4";
+const TILE_PREFIX = "solio-tiles-";
 
 const SHELL_ASSETS = [
   "./",
@@ -25,6 +32,13 @@ const SHELL_ASSETS = [
 const isTile = (url) => url.pathname.includes("/tiles/");
 const isManifest = (url) => url.pathname.endsWith("/tiles-manifest.json");
 
+/** Strip the redirected flag (and any other replay poison) off a response. */
+async function normalised(resp) {
+  if (!resp.redirected) return resp;
+  const body = await resp.blob();
+  return new Response(body, { status: resp.status, statusText: resp.statusText, headers: resp.headers });
+}
+
 self.addEventListener("install", (e) => {
   e.waitUntil(
     (async () => {
@@ -32,18 +46,7 @@ self.addEventListener("install", (e) => {
       for (const asset of SHELL_ASSETS) {
         const resp = await fetch(asset, { cache: "no-cache" });
         if (!resp.ok) throw new Error(`shell precache ${asset}: ${resp.status}`);
-        // Cloudflare 308s ./index.html -> ./ — a stored *redirected* response
-        // is rejected when replayed for an offline navigation, so re-wrap it.
-        await cache.put(
-          asset,
-          resp.redirected
-            ? new Response(await resp.blob(), {
-                status: resp.status,
-                statusText: resp.statusText,
-                headers: resp.headers,
-              })
-            : resp,
-        );
+        await cache.put(asset, await normalised(resp));
       }
       await self.skipWaiting();
     })(),
@@ -55,7 +58,9 @@ self.addEventListener("activate", (e) => {
     caches.keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((k) => k !== SHELL_CACHE && k !== TILE_CACHE).map((k) => caches.delete(k)),
+          keys
+            .filter((k) => k !== SHELL_CACHE && !k.startsWith(TILE_PREFIX))
+            .map((k) => caches.delete(k)),
         ),
       )
       .then(() => self.clients.claim()),
@@ -75,7 +80,12 @@ self.addEventListener("fetch", (e) => {
         .then((resp) => {
           if (resp.ok) {
             const copy = resp.clone();
-            caches.open(SHELL_CACHE).then((c) => c.put("./index.html", copy));
+            e.waitUntil(
+              caches
+                .open(SHELL_CACHE)
+                .then(async (c) => c.put("./index.html", await normalised(copy)))
+                .catch(() => {}),
+            );
           }
           return resp;
         })
@@ -92,7 +102,7 @@ self.addEventListener("fetch", (e) => {
         .then((resp) => {
           if (resp.ok && (resp.headers.get("content-type") || "").includes("json")) {
             const copy = resp.clone();
-            caches.open(TILE_CACHE).then((c) => c.put(req, copy));
+            e.waitUntil(caches.open(TILE_CACHE).then((c) => c.put(req, copy)).catch(() => {}));
             return resp;
           }
           return caches.match(req).then((r) => r || resp);
@@ -102,22 +112,30 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Tiles: cache-first (the precache loop fills TILE_CACHE; panning tops it up).
-  // Guard content-type so an SPA-fallback HTML page can never be cached as a tile.
+  // Tiles: cache-first — current tile cache, then ANY older tile cache (keeps
+  // the map alive mid-upgrade), then network. Guard content-type so an
+  // SPA-fallback HTML page can never be cached as a tile.
   if (isTile(url)) {
     e.respondWith(
-      caches.match(req).then(
-        (cached) =>
-          cached ||
-          fetch(req).then((resp) => {
-            const type = resp.headers.get("content-type") || "";
-            if (resp.ok && resp.type === "basic" && type.startsWith("image/")) {
-              const copy = resp.clone();
-              caches.open(TILE_CACHE).then((c) => c.put(req, copy));
-            }
-            return resp;
-          }),
-      ),
+      caches
+        .open(TILE_CACHE)
+        .then((c) => c.match(req))
+        .then(
+          (hit) =>
+            hit ||
+            caches.match(req).then(
+              (older) =>
+                older ||
+                fetch(req).then((resp) => {
+                  const type = resp.headers.get("content-type") || "";
+                  if (resp.ok && resp.type === "basic" && type.startsWith("image/")) {
+                    const copy = resp.clone();
+                    e.waitUntil(caches.open(TILE_CACHE).then((c) => c.put(req, copy)).catch(() => {}));
+                  }
+                  return resp;
+                }),
+            ),
+        ),
     );
     return;
   }
@@ -131,7 +149,7 @@ self.addEventListener("fetch", (e) => {
         const type = resp.headers.get("content-type") || "";
         if (resp.ok && resp.type === "basic" && !type.includes("text/html")) {
           const copy = resp.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(req, copy));
+          e.waitUntil(caches.open(SHELL_CACHE).then((c) => c.put(req, copy)).catch(() => {}));
         }
         return resp;
       }).catch(() => cached),

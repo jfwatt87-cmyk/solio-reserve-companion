@@ -29,10 +29,9 @@ type Manifest = { count: number; bytes: number; byZoom: Record<string, string[]>
 export const TILE_CACHE_TAG = "solio-tiles-v4";
 
 const CACHED_KEY = "solio-tiles-cached";
-// A handful of tile URLs saved at cache-completion time so we can later verify,
-// even offline, that the Cache Storage entries still exist (iOS can evict them
-// under storage pressure while leaving this flag behind — see verifyTilesCached).
-const SAMPLE_KEY = "solio-tiles-sample";
+// Expected tile count, stored at save time so verification can compare the
+// NAMED cache's contents against the full pyramid — even offline.
+const COUNT_KEY = "solio-tiles-count";
 
 /** True once the full pyramid has been pulled for the current tile version. */
 export function tilesAlreadyCached(): boolean {
@@ -43,9 +42,10 @@ export function tilesAlreadyCached(): boolean {
   }
 }
 
-function markCached() {
+function markCached(count: number) {
   try {
     localStorage.setItem(CACHED_KEY, TILE_CACHE_TAG);
+    localStorage.setItem(COUNT_KEY, String(count));
   } catch {
     /* private mode / storage disabled — harmless, we just re-run next visit */
   }
@@ -55,54 +55,68 @@ function markCached() {
 export function invalidateTileCache() {
   try {
     localStorage.removeItem(CACHED_KEY);
-    localStorage.removeItem(SAMPLE_KEY);
+    localStorage.removeItem(COUNT_KEY);
   } catch {
     /* nothing to clear */
   }
 }
 
-/** Persist a spread of tile URLs to probe later (low + high zoom). */
-function saveSample(urls: string[]) {
-  const n = Math.min(10, urls.length);
-  const step = Math.max(1, Math.floor(urls.length / n));
-  const sample: string[] = [];
-  for (let i = 0; i < urls.length && sample.length < n; i += step) sample.push(urls[i]);
-  // always include the very last (highest-zoom) tile — the first to be evicted
-  if (urls.length) sample[sample.length - 1] = urls[urls.length - 1];
+/**
+ * Confirm the saved tiles are STILL in Cache Storage. iOS may evict the cache
+ * under storage pressure without touching the localStorage flag, so a naive
+ * "saved" flag can lie. We count the tiles actually present in the NAMED tile
+ * cache against the full expected pyramid (works offline — Cache Storage is
+ * local).
+ *
+ * FAIL CLOSED (audit 2026-07-10): if we can't check, or the count falls
+ * short, report false — an honest "map not saved, re-download" beats a guest
+ * discovering a dead map in the reserve. The re-download is cheap when the
+ * cache is actually fine: already-cached tiles are counted, not re-fetched.
+ */
+export async function verifyTilesCached(): Promise<boolean> {
+  if (!tilesAlreadyCached()) return false;
+  if (typeof caches === "undefined") return false;
   try {
-    localStorage.setItem(SAMPLE_KEY, JSON.stringify(sample));
+    const cache = await caches.open(TILE_CACHE_TAG);
+    let expected = 0;
+    try {
+      expected = Number(localStorage.getItem(COUNT_KEY) || "0");
+    } catch {
+      expected = 0;
+    }
+    if (!expected) {
+      // Upgrading install (flag predates COUNT_KEY): trust the cached
+      // manifest's count — still offline-capable.
+      const m = await cache.match("tiles-manifest.json").catch(() => null);
+      const mm = m ?? (await caches.match("tiles-manifest.json").catch(() => null));
+      if (!mm) return false;
+      expected = ((await mm.clone().json()) as Manifest).count;
+      if (!expected) return false;
+    }
+    const keys = await cache.keys();
+    const tiles = keys.filter((k) => new URL(k.url).pathname.includes("/tiles/")).length;
+    return tiles >= expected;
   } catch {
-    /* storage disabled — verification just trusts the flag */
+    return false;
   }
 }
 
 /**
- * Confirm the saved tiles are STILL in Cache Storage. iOS may evict the cache
- * under storage pressure without touching this localStorage flag, so a naive
- * "saved" flag can lie. We probe a stored sample of tile URLs (works offline —
- * Cache Storage is local). Returns true if the map can be trusted offline.
- *
- * Conservative: if we can't check (no Cache API / no sample / probe error) we
- * return true rather than needlessly nuke a good cache.
+ * Retire superseded tile caches. The service worker's activate step
+ * deliberately KEEPS old solio-tiles-* caches so a mid-upgrade guest still
+ * has a working map; they are deleted here, only after the new pyramid is
+ * fully saved and verified.
  */
-export async function verifyTilesCached(): Promise<boolean> {
-  if (!tilesAlreadyCached()) return false;
-  if (typeof caches === "undefined") return true;
-  let sample: string[] = [];
+async function cleanupOldTileCaches() {
   try {
-    sample = JSON.parse(localStorage.getItem(SAMPLE_KEY) || "[]");
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((k) => k.startsWith("solio-tiles-") && k !== TILE_CACHE_TAG)
+        .map((k) => caches.delete(k)),
+    );
   } catch {
-    return true;
-  }
-  if (!Array.isArray(sample) || sample.length === 0) return true;
-  try {
-    for (const url of sample) {
-      const hit = await caches.match(url);
-      if (!hit) return false;
-    }
-    return true;
-  } catch {
-    return true;
+    /* old caches linger harmlessly until the next successful save */
   }
 }
 
@@ -210,7 +224,7 @@ export async function precacheTiles(
   if (tileKeys < total) return { saved: false, aborted: false, done, total };
 
   report();
-  saveSample(urls);
-  markCached();
+  markCached(total);
+  await cleanupOldTileCaches();
   return { saved: true, aborted: false, done: total, total };
 }
