@@ -1,8 +1,16 @@
-name: Deploy PWA to GitHub Pages
+name: Publish mirror (GitHub Pages)
 
+# Single-artifact releases (D78): tools/deploy-prod.sh builds ONE dist/ from
+# clean, verified main, deploys it to Cloudflare Pages (the primary) and
+# force-pushes the SAME files to the gh-pages branch, then dispatches this
+# workflow. This job publishes that branch VERBATIM — no rebuild — so both
+# hosts serve byte-identical artifacts (version.json matches to the byte).
+#
+# There is deliberately no push trigger: a push is never a release (D57), and
+# a rebuild here could differ from what the primary serves. Dispatching from
+# any ref is harmless — the job always publishes gh-pages content, which only
+# the guarded deploy script (main-only, clean-tree, origin-synced) writes.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,27 +24,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: gh-pages
+          path: site
+      - run: rm -rf site/.git
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v5

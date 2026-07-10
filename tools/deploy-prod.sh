@@ -41,5 +41,35 @@ if [ "$live" = "$sha" ]; then
 else
   echo "deploy:prod: WARNING — primary reports '$live', expected '$sha' (propagation lag? investigate before tagging)" >&2
 fi
-echo "deploy:prod: NOW verify the GH mirror serves the same sha after pushing,"
-echo "then tag: git tag release-$(date +%Y%m%d)-$sha && git push --tags"
+
+# Single-artifact mirror (D78): the GH Pages mirror must serve the EXACT files
+# just deployed to Cloudflare — never a separate rebuild, which could differ.
+# Push this dist/ verbatim to the gh-pages branch, then dispatch the publish
+# workflow (which uploads that branch as-is).
+echo
+echo "deploy:prod: publishing the same artifact to the GH Pages mirror (gh-pages branch)…"
+mirror_tmp=$(mktemp -d)
+cp -R dist/. "$mirror_tmp/"
+touch "$mirror_tmp/.nojekyll"
+git -C "$mirror_tmp" init -q -b gh-pages
+git -C "$mirror_tmp" add .
+git -C "$mirror_tmp" -c user.name="solio-deploy" -c user.email="deploy@invalid" \
+  commit -qm "mirror artifact ${sha}"
+git -C "$mirror_tmp" push -f "$(git remote get-url origin)" gh-pages:gh-pages
+rm -rf "$mirror_tmp"
+gh workflow run deploy.yml --ref main
+echo "deploy:prod: verifying the mirror serves the same artifact (this waits on Actions)…"
+mirror=""
+for i in $(seq 1 20); do
+  sleep 15
+  mirror=$(curl -s --max-time 10 "https://jfwatt87-cmyk.github.io/solio-reserve-companion/version.json?nocache=$(date +%s)" | sed -n 's/.*"sha":"\([^"]*\)".*/\1/p')
+  [ "$mirror" = "$sha" ] && break
+done
+if [ "$mirror" = "$sha" ]; then
+  echo "deploy:prod: MIRROR VERIFIED — serving $mirror (same artifact)"
+else
+  echo "deploy:prod: WARNING — mirror reports '$mirror', expected '$sha' (check the Actions run before tagging)" >&2
+fi
+
+echo
+echo "deploy:prod: if BOTH hosts verified, tag: git tag release-$(date +%Y%m%d)-$sha && git push --tags"

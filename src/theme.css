@@ -348,6 +348,11 @@ body {
 .welcome-save-note .map-dl-track { background: rgba(244, 239, 230, 0.18); }
 .welcome-save-note .map-dl-fill { background: var(--ochre); }
 .welcome-save-sub { display: block; margin-top: 8px; font-size: 11.5px; color: rgba(244, 239, 230, 0.7); }
+/* Durability tip under the saved pill when storage is still best-effort. */
+.welcome-save-tip {
+  font-size: 11.5px; line-height: 1.5; color: rgba(244, 239, 230, 0.7);
+  margin: -8px 0 16px; text-align: center;
+}
 /* Positive confirmation shown on the welcome once the map is saved. */
 .welcome-save-ok {
   display: inline-flex; align-items: center; gap: 6px;
