@@ -7,10 +7,10 @@
  * through its inverse georeference, then into the box (see `toDisplay`), so the
  * "you are here" dot lands on the right feature while the poster never tilts.
  *
- * Overlays are kept as their existing hand-drawn styling: POIs, rhinos, the
- * live "you are here" dot and sightings are HTML markers positioned by MapLibre
- * in lng/lat; the route line and rhino "approximate zone" circles are GeoJSON
- * layers. Everything is authored in world coordinates, so no pixel maths here.
+ * Overlays keep their hand-drawn styling: POIs and the live "you are here" dot
+ * are HTML markers positioned by MapLibre in lng/lat; the route line is a
+ * GeoJSON layer. Everything is authored in world coordinates, so no pixel
+ * maths here. (No animal-location data exists anywhere in the app.)
  */
 
 import { useEffect, useRef, useState } from "react";

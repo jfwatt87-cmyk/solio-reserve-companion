@@ -1,8 +1,8 @@
 /* MapLibre map + DOM marker styling for the reserve map.
    The base map is Callan's georeferenced poster, inlined as a single image
-   source; overlays (POIs, sightings, the live user dot) are HTML markers so
-   they keep the hand-drawn styling and rich interactions, positioned by
-   MapLibre in lng/lat.
+   source; overlays (POIs, the live user dot) are HTML markers so they keep
+   the hand-drawn styling and rich interactions, positioned by MapLibre in
+   lng/lat.
 
    NOTE: MapLibre sets `transform` on the marker's own element every frame to
    position it, so any scale/offset of ours must live on an INNER child. */

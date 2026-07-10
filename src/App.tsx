@@ -117,7 +117,9 @@ export default function App() {
     () => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("poi")),
   );
   const [destPoiId, setDestPoiId] = useState<string | null>(
-    () => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("nav")),
+    // ?nav= must respect the NAV_ENABLED hold like every other entry point —
+    // otherwise a shared/bookmarked URL draws a route no UI can dismiss.
+    () => (typeof window === "undefined" || !NAV_ENABLED ? null : new URLSearchParams(window.location.search).get("nav")),
   );
   // Mid-drive waypoints (POI ids, in order) visited before the destination.
   const [stops, setStops] = useState<string[]>([]);
@@ -153,6 +155,13 @@ export default function App() {
     setA2hsDismissed(true);
   }
   const [toast, setToast] = useState<string | null>(null);
+  // Toasts are transient by definition: auto-dismiss after 6 s (a new toast
+  // re-arms the timer). Nothing else ever clears them.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
   // Transient notice when a live guest crosses the reserve boundary (buffered).
   const [reserveAlert, setReserveAlert] = useState<string | null>(null);
   const wasInReserve = useRef<boolean | null>(null);
@@ -506,7 +515,11 @@ export default function App() {
       ? [multiStopRoute(start.id, [...stops, destPoiId])].filter((r): r is Route => !!r)
       : network.alternatives(start.id, dest.nodeId, 3);
     if (!opts.length || opts[0].path.length < 2) {
-      setToast(`You're already at ${dest.name}`);
+      // No route can also mean the POI isn't bound to a road (e.g. the airstrip
+      // until Callan adds its track) — don't tell a guest 10 km away they've
+      // "arrived"; be honest about the missing road instead.
+      const near = distanceMeters(from, poiWorld(dest)) < 250;
+      setToast(near ? `You're already at ${dest.name}` : `No drivable route to ${dest.name} yet`);
       setDestPoiId(null);
       setStops([]);
       setRouteOptions([]);
@@ -668,7 +681,10 @@ export default function App() {
   function driveRoute() {
     const r = routePreview;
     if (!r || r.path.length < 2) {
-      if (destPoi) setToast(`You're already at ${destPoi.name}`);
+      if (destPoi) {
+        const near = !!user && distanceMeters(user, poiWorld(destPoi)) < 250;
+        setToast(near ? `You're already at ${destPoi.name}` : `No drivable route to ${destPoi.name} yet`);
+      }
       setDestPoiId(null);
       return;
     }
@@ -700,6 +716,7 @@ export default function App() {
   const currentStop = tour ? tour.stops[tourStop] ?? null : null;
 
   function driveToStop(t: Tour, idx: number) {
+    if (!NAV_ENABLED) return; // tours drive the nav/sim engine — held with navigation
     const stop = t.stops[idx];
     const poi = stop && POIS.find((p) => p.id === stop.poiId);
     if (!poi || !user) return;
@@ -711,6 +728,11 @@ export default function App() {
     const start = network.nearestNode(user);
     const r = network.route(start.id, poi.nodeId);
     if (!r || r.path.length < 2) {
+      if (distanceMeters(user, poiWorld(poi)) > 250) {
+        // Unroutable stop (POI not bound to a road) — say so, don't fake arrival.
+        setToast(`No drivable route to ${poi.name} yet`);
+        return;
+      }
       // Already at this stop — go straight to the commentary.
       setTourAtStop(true);
       return;
@@ -726,6 +748,7 @@ export default function App() {
     setPlaying(true);
   }
   function startTour(t: Tour) {
+    if (!NAV_ENABLED) return; // tours drive the nav/sim engine — held with navigation
     if (!user) { setToast("Waiting for your location…"); return; }
     setStops([]); // a tour is its own itinerary — drop any custom waypoints
     setTour(t);
@@ -1089,7 +1112,18 @@ export default function App() {
               <div className="status-row">
                 <div className="seg">
                   <button className={source === "sim" ? "on" : ""} onClick={() => setSource("sim")}>Demo drive</button>
-                  <button className={source === "gps" ? "on" : ""} onClick={() => setSource("gps")}>Use my GPS</button>
+                  <button
+                    className={source === "gps" ? "on" : ""}
+                    onClick={() => {
+                      // Leaving sim: drop the simulated position/heading so the
+                      // first REAL fix starts clean — otherwise the stale sim
+                      // pose lingers on the dot and can fire a bogus
+                      // boundary alert when the real fix lands elsewhere.
+                      setSource("gps");
+                      setUser(null);
+                      setHeading(null);
+                    }}
+                  >Use my GPS</button>
                 </div>
                 {source === "sim" && (
                   <div className="seg small">
