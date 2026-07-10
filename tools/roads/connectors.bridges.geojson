@@ -1,0 +1,51 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "",
+    "surface": "dirt",
+    "source": "bridge-manual",
+    "fix": "tharua-bridge",
+    "evidence": "Tharua Bridge (1): kingfisher->east halved"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.922649648451134,
+      -0.14729134231382998
+     ],
+     [
+      36.923819868902974,
+      -0.1469355037549226
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "",
+    "surface": "dirt",
+    "source": "bridge-manual",
+    "fix": "browns-bridge",
+    "evidence": "Browns Bridge (2): yellowthorn->choroa"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.943600048518434,
+      -0.16122123568699856
+     ],
+     [
+      36.9431154984228,
+      -0.1611791283558342
+     ]
+    ]
+   }
+  }
+ ]
+}
