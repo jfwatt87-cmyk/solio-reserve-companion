@@ -23,10 +23,13 @@ Production is **two hosts serving the same artifact**:
    including experiment branches. `npm run deploy:prod` refuses to run unless
    you're on `main`, the tree is clean, and you're in sync with `origin/main`,
    then rebuilds before deploying.
-4. **Verify BOTH hosts after every release** (content marker, not byte-hash —
-   Cloudflare rewrites HTML): load the site, confirm the change is visible, and
-   check `sw.js` serves the new cache version. Custom-domain propagation can lag
-   a few minutes behind pages.dev.
+4. **Verify BOTH hosts after every release**: `curl -s <host>/version.json`
+   must return the released commit SHA on map.soliogamereserve.org AND the
+   github.io mirror (stamped by the postbuild step). Then load the site and
+   confirm the change is visible. Custom-domain propagation can lag a few
+   minutes behind pages.dev.
+   Touched the road network? `npm run test:roads` must pass before committing
+   a regenerated roads.gis.ts.
 5. **Tag every release**: `git tag release-YYYYMMDD-<shortsha> && git push --tags`.
    Tags are the rollback anchors.
 
