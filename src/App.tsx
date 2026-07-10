@@ -202,10 +202,24 @@ export default function App() {
   // Watch for the service worker taking control (first launch claims the page
   // asynchronously, after load), so the proactive precache below can start on
   // this open instead of waiting for the next one.
+  const precacheStarted = useRef(false);
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     if (navigator.serviceWorker.controller) setSwControlled(true);
-    const onChange = () => setSwControlled(!!navigator.serviceWorker.controller);
+    const onChange = () => {
+      setSwControlled(!!navigator.serviceWorker.controller);
+      // A new service worker just took control (a release happened mid-session).
+      // A tile release empties the old tile cache, so the "saved" claim must be
+      // re-validated NOW — not at next launch — or the chip lies in the bush.
+      verifyTilesCached().then((ok) => {
+        if (!ok) {
+          invalidateTileCache();
+          precacheStarted.current = false;
+          setPrecache({ state: "idle", pct: 0 });
+        }
+        setCacheNonce((n) => n + 1); // let the precache effect re-evaluate
+      });
+    };
     navigator.serviceWorker.addEventListener("controllerchange", onChange);
     // `ready` resolves once a worker is active — a backstop in case control
     // arrived before this listener attached.
@@ -215,7 +229,6 @@ export default function App() {
     return () => navigator.serviceWorker.removeEventListener("controllerchange", onChange);
   }, []);
 
-  const precacheStarted = useRef(false);
   useEffect(() => {
     // Not gated on mapLoaded: the tile pyramid is fetched directly, so the save
     // can begin during the "preparing" splash rather than after the map shows.
@@ -227,11 +240,45 @@ export default function App() {
     setPrecache({ state: "saving", pct: 0 });
     precacheTiles(
       import.meta.env.BASE_URL,
-      ({ done, total }) => setPrecache({ state: done >= total ? "saved" : "saving", pct: total ? done / total : 0 }),
+      // Progress never claims "saved" — only the verified final result may.
+      ({ done, total }) => setPrecache({ state: "saving", pct: total ? done / total : 0 }),
       ac.signal,
-    ).catch(() => { precacheStarted.current = false; setPrecache({ state: "idle", pct: 0 }); });
+    )
+      .then((r) => {
+        if (r.saved) {
+          setPrecache({ state: "saved", pct: 1 });
+          return;
+        }
+        // Aborted (connectivity flip / unmount) or tiles genuinely failed:
+        // clear the started latch so the effect can run again — the old code
+        // left it set and the save could never resume within the session.
+        precacheStarted.current = false;
+        if (!r.aborted) setPrecache({ state: "idle", pct: r.total ? r.done / r.total : 0 });
+      })
+      .catch(() => {
+        precacheStarted.current = false;
+        setPrecache({ state: "idle", pct: 0 });
+      });
     return () => ac.abort();
   }, [online, swControlled, cacheNonce]);
+
+  // Gentle self-heal: while the map is NOT saved but we look online with a
+  // controlling SW, retry every 20 s (covers captive-portal wifi, upstream
+  // outages and failed-tile runs) and on returning to the foreground. Cheap:
+  // already-cached tiles are skipped, so a retry only pulls what's missing.
+  useEffect(() => {
+    if (precache.state !== "idle" || !online || !swControlled) return;
+    if (tilesAlreadyCached()) return;
+    const t = setTimeout(() => setCacheNonce((n) => n + 1), 20_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") setCacheNonce((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [precache.state, online, swControlled, cacheNonce]);
 
   // Integrity guard for silent eviction. iOS can drop the tile cache under
   // storage pressure while leaving the "saved" flag behind, so a returning guest
