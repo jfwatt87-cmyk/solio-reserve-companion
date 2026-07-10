@@ -165,10 +165,42 @@ def load_lines(path: Path) -> list[dict]:
     return lines
 
 
+class _Grid:
+    """Spatial hash over lng/lat points so proximity queries are O(1)-ish —
+    the naive all-pairs scans made large traces (34k lines) take tens of
+    minutes; this brings the whole noding pass to seconds."""
+
+    def __init__(self, cell_m: float):
+        self.cell = cell_m
+        self.cells: dict[tuple[int, int], list[int]] = {}
+        self.pts: list[tuple[float, float]] = []
+
+    def _key(self, p: tuple[float, float]) -> tuple[int, int]:
+        return (int(p[0] * M_PER_DEG_LNG // self.cell), int(p[1] * M_PER_DEG_LAT // self.cell))
+
+    def add(self, p: tuple[float, float]) -> int:
+        i = len(self.pts)
+        self.pts.append(p)
+        self.cells.setdefault(self._key(p), []).append(i)
+        return i
+
+    def near(self, p: tuple[float, float], r: float):
+        kx, ky = self._key(p)
+        span = int(r // self.cell) + 1
+        for dx in range(-span, span + 1):
+            for dy in range(-span, span + 1):
+                for i in self.cells.get((kx + dx, ky + dy), []):
+                    if dist_m(p, self.pts[i]) <= r:
+                        yield i
+
+
 def node_lines(lines: list[dict]) -> tuple[list[tuple[float, float]], list[dict]]:
     """Split lines where another line's endpoint touches them, then cluster
     endpoints into shared junction nodes. Returns (nodes, edges)."""
-    endpoints = [ln["pts"][k] for ln in lines for k in (0, -1)]
+    ep_grid = _Grid(max(SNAP_M, 1.0))
+    for ln in lines:
+        ep_grid.add(ln["pts"][0])
+        ep_grid.add(ln["pts"][-1])
 
     # split any line at interior vertices that coincide with some endpoint
     split: list[dict] = []
@@ -176,7 +208,7 @@ def node_lines(lines: list[dict]) -> tuple[list[tuple[float, float]], list[dict]
         pts = ln["pts"]
         cut = [0]
         for i in range(1, len(pts) - 1):
-            if any(dist_m(pts[i], e) <= SNAP_M for e in endpoints):
+            if next(ep_grid.near(pts[i], SNAP_M), None) is not None:
                 cut.append(i)
         cut.append(len(pts) - 1)
         for a, b in zip(cut, cut[1:]):
@@ -185,11 +217,16 @@ def node_lines(lines: list[dict]) -> tuple[list[tuple[float, float]], list[dict]
 
     # cluster endpoints -> nodes
     nodes: list[tuple[float, float]] = []
+    node_grid = _Grid(max(SNAP_M, 1.0))
 
     def node_id(p: tuple[float, float]) -> int:
-        for i, n in enumerate(nodes):
-            if dist_m(p, n) <= SNAP_M:
-                return i
+        # Match the pre-grid semantics exactly: the LOWEST-index node within
+        # range wins (insertion-order chaining) — an arbitrary cell-order match
+        # splits clusters differently and fragments the graph.
+        hits = list(node_grid.near(p, SNAP_M))
+        if hits:
+            return min(hits)
+        node_grid.add(p)
         nodes.append(p)
         return len(nodes) - 1
 
@@ -245,6 +282,251 @@ def keep_largest_component(
     return new_nodes, new_edges
 
 
+def load_blocker_lines(paths: list[Path]) -> list[list[tuple[float, float]]]:
+    """Blocker lines: joins the evidence does NOT support (e.g. unconfirmed
+    river crossings). Any edge realising one of these joins is cut."""
+    blockers: list[list[tuple[float, float]]] = []
+    for p in paths:
+        data = json.loads(Path(p).read_text())
+        for f in data.get("features", []):
+            g = f.get("geometry") or {}
+            lines = [g["coordinates"]] if g.get("type") == "LineString" else (
+                g["coordinates"] if g.get("type") == "MultiLineString" else [])
+            for line in lines:
+                blockers.append([(float(c[0]), float(c[1])) for c in line])
+    return blockers
+
+
+def _segs_properly_intersect(p1, p2, p3, p4) -> bool:
+    def ccw(a, b, c):
+        return (c[1] - a[1]) * (b[0] - a[0]) - (b[1] - a[1]) * (c[0] - a[0])
+    d1, d2 = ccw(p3, p4, p1), ccw(p3, p4, p2)
+    d3, d4 = ccw(p1, p2, p3), ccw(p1, p2, p4)
+    return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
+
+
+def cut_blocked_edges(
+    nodes: list[tuple[float, float]], edges: list[dict],
+    blockers: list[list[tuple[float, float]]],
+) -> list[dict]:
+    """Remove every realisation of a blocked join. Three forms:
+    (a) an edge directly connecting the nodes at the join's endpoints
+        (vertex-snapped connectors);
+    (b) a healed seam INSIDE a longer edge — the blocker lies along part of the
+        edge polyline; the overlapping SPAN is cut out (surgical split), leaving
+        the rest of the road intact;
+    (c) an edge properly crossing the blocker (cut whole — it drives over the
+        unverified crossing)."""
+    TOL = 12.0  # m
+
+    def dist_to_poly(p, pts):
+        return min(project_to_segment(p, a, b)[2] for a, b in zip(pts, pts[1:]))
+
+    def nearest_node(p):
+        bi, bd = None, None
+        for i, n in enumerate(nodes):
+            d = dist_m(p, n)
+            if bd is None or d < bd:
+                bi, bd = i, d
+        return bi, bd
+
+    def poly_mid(pts):
+        return pts[len(pts) // 2]
+
+    def nearest_vertex_idx(pts, p):
+        return min(range(len(pts)), key=lambda i: dist_m(pts[i], p))
+
+    pair_cut: set[frozenset] = set()
+    for line in blockers:
+        ia, da = nearest_node(line[0])
+        ib, db = nearest_node(line[-1])
+        if ia != ib and da <= 40 and db <= 40:
+            pair_cut.add(frozenset((ia, ib)))
+
+    out: list[dict] = []
+    cuts = 0
+    hit: set[int] = set()
+    queue = list(edges)
+    while queue:
+        e = queue.pop()
+        if frozenset((e["a"], e["b"])) in pair_cut:
+            cuts += 1
+            continue
+        pts = e["pts"]
+        acted = False
+        done = e.get("_done") or set()
+        for bi, line in enumerate(blockers):
+            if bi in done:
+                continue  # this lineage already had blocker bi cut out
+            bmid = poly_mid(line)
+            if dist_to_poly(bmid, pts) <= TOL:
+                # (b) seam inside this edge: remove the overlapped span
+                i0 = nearest_vertex_idx(pts, line[0])
+                i1 = nearest_vertex_idx(pts, line[-1])
+                lo, hi = min(i0, i1), max(i0, i1)
+                if hi == lo:  # blocker shorter than vertex spacing — still
+                    hi = min(lo + 1, len(pts) - 1)  # remove one whole segment
+                    lo = max(0, lo - (1 if hi == lo else 0))
+                hit.add(bi)
+                cuts += 1
+                acted = True
+                left, right = pts[: lo + 1], pts[hi:]
+                # each remnant becomes a stub ending at a NEW node
+                for part in (left, right):
+                    if len(part) >= 2 and sum(
+                        dist_m(a, b) for a, b in zip(part, part[1:])
+                    ) > 5:
+                        nid = len(nodes)
+                        nodes.append(part[-1] if part is left else part[0])
+                        stub = dict(e)
+                        stub["pts"] = part
+                        stub["_done"] = done | {bi}
+                        if part is left:
+                            stub["b"] = nid
+                        else:
+                            stub["a"] = nid
+                        queue.append(stub)  # re-check: another blocker may overlap
+                break
+            crossed = False
+            for i in range(len(pts) - 1):
+                for j in range(len(line) - 1):
+                    if _segs_properly_intersect(pts[i], pts[i + 1], line[j], line[j + 1]):
+                        crossed = True
+                        break
+                if crossed:
+                    break
+            if crossed:
+                hit.add(bi)
+                cuts += 1
+                acted = True
+                break
+        if not acted:
+            out.append(e)
+    unrealised = len(blockers) - len(hit) - len(pair_cut)
+    print(f"  blocked joins: {cuts} cut(s) ({len(pair_cut)} node-pair; {len(hit)} seam/crossing; "
+          f"~{max(unrealised, 0)} blocker(s) not present in the graph)")
+    return out
+
+
+def _rdp(pts: list[tuple[float, float]], eps_m: float) -> list[tuple[float, float]]:
+    """Iterative Douglas–Peucker in metres (no recursion — chains can be long)."""
+    if len(pts) < 3:
+        return pts
+    keep = [False] * len(pts)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(pts) - 1)]
+    while stack:
+        a, b = stack.pop()
+        if b - a < 2:
+            continue
+        worst_d, worst_i = -1.0, -1
+        for i in range(a + 1, b):
+            _t, _proj, d = project_to_segment(pts[i], pts[a], pts[b])
+            if d > worst_d:
+                worst_d, worst_i = d, i
+        if worst_d > eps_m:
+            keep[worst_i] = True
+            stack.append((a, worst_i))
+            stack.append((worst_i, b))
+    return [p for p, k in zip(pts, keep) if k]
+
+
+def _edge_len(e: dict) -> float:
+    return sum(dist_m(a, b) for a, b in zip(e["pts"], e["pts"][1:]))
+
+
+def dedupe_parallel_edges(edges: list[dict]) -> list[dict]:
+    """The poster trace double-draws some corridors, yielding two near-identical
+    edges between the same junction pair. Keep the shorter when the pair is
+    within 20% in length (a genuine second road between the same junctions is
+    much longer than its sibling)."""
+    by_pair: dict[frozenset, list[dict]] = {}
+    for e in edges:
+        if e["a"] == e["b"]:
+            by_pair.setdefault(("loop", id(e)), []).append(e)  # never dedupe loops
+        else:
+            by_pair.setdefault(frozenset((e["a"], e["b"])), []).append(e)
+    out: list[dict] = []
+    dropped = 0
+    for group in by_pair.values():
+        group = sorted(group, key=_edge_len)
+        keep = [group[0]]
+        for e in group[1:]:
+            if _edge_len(e) <= _edge_len(keep[0]) * 1.2:
+                dropped += 1  # near-duplicate parallel — drop
+            else:
+                keep.append(e)  # genuinely different road
+        out.extend(keep)
+    if dropped:
+        print(f"  deduped {dropped} near-duplicate parallel edge(s)")
+    return out
+
+
+def merge_chains(
+    nodes: list[tuple[float, float]], edges: list[dict], simplify_m: float
+) -> tuple[list[tuple[float, float]], list[dict]]:
+    """Collapse degree-2 nodes so every edge runs junction-to-junction with the
+    geometry carried in `via` vertices, then Douglas–Peucker the polylines.
+    This is what turns 4,300 two-point stubs into a few hundred real edges."""
+    edges = [dict(e) for e in edges]
+    while True:
+        inc: dict[int, list[int]] = {}
+        for ei, e in enumerate(edges):
+            inc.setdefault(e["a"], []).append(ei)
+            inc.setdefault(e["b"], []).append(ei)
+        consumed: set[int] = set()
+        merges: list[tuple[int, int, int]] = []  # (node, e1, e2)
+        for n, eis in inc.items():
+            if len(eis) != 2:
+                continue
+            e1i, e2i = eis
+            if e1i == e2i or e1i in consumed or e2i in consumed:
+                continue  # self-loop at n, or edge already part of another merge
+            if edges[e1i]["a"] == edges[e1i]["b"] or edges[e2i]["a"] == edges[e2i]["b"]:
+                continue
+            merges.append((n, e1i, e2i))
+            consumed.add(e1i)
+            consumed.add(e2i)
+        if not merges:
+            break
+        applied = 0
+        dead: set[int] = set()
+        for n, e1i, e2i in merges:
+            e1, e2 = edges[e1i], edges[e2i]
+            p1 = e1["pts"] if e1["b"] == n else list(reversed(e1["pts"]))
+            a = e1["a"] if e1["b"] == n else e1["b"]
+            p2 = e2["pts"] if e2["a"] == n else list(reversed(e2["pts"]))
+            b = e2["b"] if e2["a"] == n else e2["a"]
+            if a == b:
+                continue  # merging would create a loop — leave the pair split
+            applied += 1
+            edges.append({
+                "a": a, "b": b,
+                "name": e1["name"] or e2["name"],
+                "surface": e1["surface"],
+                "pts": p1 + p2[1:],
+            })
+            dead.add(e1i)
+            dead.add(e2i)
+        edges = [e for ei, e in enumerate(edges) if ei not in dead]
+        if not applied:
+            break  # every remaining candidate is a would-be loop — done
+
+    for e in edges:
+        e["pts"] = _rdp(e["pts"], simplify_m)
+
+    # drop nodes no edge references any more, reindexing
+    used = sorted({e["a"] for e in edges} | {e["b"] for e in edges})
+    remap = {old: i for i, old in enumerate(used)}
+    new_nodes = [nodes[old] for old in used]
+    for e in edges:
+        e["a"] = remap[e["a"]]
+        e["b"] = remap[e["b"]]
+    print(f"  chain-merged -> {len(new_nodes)} node(s), {len(edges)} edge(s) "
+          f"(simplified at {simplify_m:g} m)")
+    return new_nodes, edges
+
+
 def load_pois() -> list[tuple[str, float, float]]:
     """(nodeId, lng, lat) for each POI, via the corner georeference."""
     src = (ROOT / "src/data/pois.ts").read_text()
@@ -273,17 +555,40 @@ def main() -> None:
                     help="extra GeoJSON of connector centrelines to node into the network "
                          "(e.g. tools/roads/connectors.gpx.geojson — real tracks recovered from the "
                          "GPX survey to bridge gaps the export left disconnected). Repeatable.")
+    ap.add_argument("--block", type=Path, action="append", default=[],
+                    help="GeoJSON of join lines the evidence does NOT support (e.g. unconfirmed "
+                         "river crossings) — every edge realising one is cut before routing. "
+                         "Repeatable.")
+    ap.add_argument("--simplify", type=float, default=6.0,
+                    help="Douglas-Peucker tolerance in metres for edge geometry (default 6; 0 disables)")
     args = ap.parse_args()
 
     SNAP_M = args.snap
 
+    import time as _time
+    _t0 = _time.time()
+    def _stage(msg):
+        print(f"  [{_time.time()-_t0:7.1f}s] {msg}", flush=True)
     lines = load_lines(args.geojson)
+    _stage(f"loaded {len(lines)} lines")
     for cpath in args.connectors:
         extra = load_lines(cpath)
         print(f"  + {len(extra)} connector line(s) from {cpath.name}")
         lines.extend(extra)
     nodes, edges = node_lines(lines)
+    _stage(f"noded: {len(nodes)} nodes, {len(edges)} edges")
+    if args.block:
+        blockers = load_blocker_lines(args.block)
+        print(f"  blocking {len(blockers)} unsupported join(s) from {', '.join(p.name for p in args.block)}")
+        edges = cut_blocked_edges(nodes, edges, blockers)
+        _stage("blockers cut")
     nodes, edges = keep_largest_component(nodes, edges)
+    _stage("largest component kept")
+    edges = dedupe_parallel_edges(edges)
+    _stage("parallels deduped")
+    if args.simplify >= 0:
+        nodes, edges = merge_chains(nodes, edges, args.simplify)
+        _stage("chains merged")
     print(f"read {len(lines)} centreline(s) -> {len(nodes)} node(s), {len(edges)} edge(s)")
 
     # bind POI ids onto the nearest road edge (splitting mid-segment as needed)

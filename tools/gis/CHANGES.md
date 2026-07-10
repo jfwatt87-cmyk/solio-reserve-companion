@@ -102,6 +102,31 @@ the 34 undrawn sublines were never put to Callan. Both fixed with data:
 25 unconfirmed river crossings (Browns/JW among them). The "safe mode" build
 (routable = confirmed crossings + dry-land joins only) is designed but NOT built.
 
+## SAFE MODE shipped as the branch network (2026-07-10)
+`src/data/roads.gis.ts` is now the **evidence-gated** build: the app cannot
+route over ANY unconfirmed river crossing.
+
+- Importer gained `--block` (cuts every graph realisation of a blocked join:
+  node-pair connectors, healed seams inside longer edges via span removal, and
+  proper crossings) + degree-2 **chain-merge** with Douglas-Peucker (6 m) and
+  parallel-edge dedupe + a spatial grid making the noding pass ~0.4 s (was
+  10+ min; two of my own bugs fixed on the way: grid cluster tie-breaking must
+  be lowest-index to match the old semantics, and a merge/span-cut runaway).
+- Blockers = `tools/roads/blockers.unconfirmed-crossings.geojson` (the 22
+  joins at the 7 unconfirmed sites). 8 realisations cut; S20's only crossing
+  was the manual jw connector, now parked in
+  `tools/roads/connectors.unconfirmed.geojson` (re-add when Callan confirms);
+  the remaining blocker joins were never in the trace at all.
+- **Measured cost of safety ~= zero**: avg detour 1.52->1.53, no POI pair lost,
+  gate->orphanage unchanged 2.42 km; worst regressions ~+20% on three
+  kingfisher pairs. (`tools/roads/measure_network.py` compares two builds.)
+- File 530 KB -> **358 KB** (bundle 1.53 -> 1.42 MB); the routing graph + demo
+  patrol now build LAZILY (guest launches don't pay for routing at all).
+- Regenerate with:
+  `python3 tools/roads/import_gis_roads.py tools/roads/poster_roads.geojson \
+     --connectors tools/roads/connectors.bridges.geojson \
+     --block tools/roads/blockers.unconfirmed-crossings.geojson`
+
 ## Known trade-offs / follow-ups
 - Emitted file ~530 KB (v1: 69 KB) — bundle 1.53 MB (was 1.25 MB). Needs a
   degree-2 chain-merge pass in the importer before any production ship.
