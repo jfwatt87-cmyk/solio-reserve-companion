@@ -56,9 +56,13 @@ Useful URL params: `?skipWelcome` (skip the welcome screen), `?tab=drives`
 
 ## Deployment
 
-Push to `main` and GitHub Actions builds and publishes `dist/` to **GitHub
-Pages** (`.github/workflows/deploy.yml`). There is no server component today —
-the app is static files.
+**See [DEPLOY.md](DEPLOY.md) — read it before touching production.** Short
+version: Cloudflare Pages (map.soliogamereserve.org) is the **primary**,
+deployed manually via `npm run deploy:prod` (guarded: clean, in-sync `main`
+only, and it unsets the wrong-account `CLOUDFLARE_API_TOKEN`). Pushing to
+`main` auto-publishes only the **GitHub Pages mirror**
+(`.github/workflows/deploy.yml`) — a push is never a full release. There is no
+server component today — the app is static files.
 
 The production build is unusual in a good way:
 
