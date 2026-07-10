@@ -11,7 +11,7 @@ Originals are UNTOUCHED. Everything below is derived from them reproducibly.
 ## Deterministic exports (tools/gis/layers/, via export_layers.sh; sha256 in MANIFEST.sha256)
 | layer | verdict after assessment |
 |---|---|
-| `Solio_Reserve_Roads` | ONE unclassified MultiLineString, 157 sublines, ~164 km. **Mixed quality**: 99 lines (89 km) match drawn roads; 8 (1.3 km) drawn perimeter; **16 (25 km) bare fence**; **34 (48 km) not drawn on the guest map**; missing whole drawn corridors (orphanage/gate, Rhino Gate access, west inside-fence track) |
+| `Solio_Reserve_Roads` | ONE unclassified MultiLineString, 157 sublines, ~164 km. **Mixed quality**: 105 lines (103.4 km) match drawn roads; 8 (1.3 km) drawn perimeter; **16 (25.3 km) bare fence**; **28 (33.7 km) not drawn on the guest map** (corrected 2026-07-09 late: first count said 34/48 km — an 0-based/1-based subline mix-up had let fence lines contaminate the undrawn set; totals now tie to Shape_Length 163.77 km exactly); missing whole drawn corridors (orphanage/gate, Rhino Gate access, west inside-fence track) |
 | `Boundary_Solio_Game_reserve` | authoritative fence line (47 verts) — used for classification + geofence |
 | `Solio_Game_Reserve_Perimitter_Road` | polygon ring ~46.2 km, median 12 m from fence — perimeter road concept exists along the fence |
 | `River_Solio_Game_Reserve` | 46 lines, 52 km — used to sanity-check bridge crossings |
