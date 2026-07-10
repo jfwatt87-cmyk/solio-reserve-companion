@@ -17,6 +17,7 @@ import {
 import { stepInstruction, type Route, type RouteStep } from "./lib/routing";
 import { pathLength, poseAlong } from "./lib/sim";
 import { precacheTiles, tilesAlreadyCached, verifyTilesCached, invalidateTileCache, requestPersistentStorage } from "./lib/precache";
+import { navAuthCached, refreshNavAuth } from "./lib/navAuth";
 import { detectInApp, type InAppInfo } from "./lib/inapp";
 
 type Tab = "explore" | "drives" | "about";
@@ -133,9 +134,11 @@ export default function App() {
     () => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("poi")),
   );
   const [destPoiId, setDestPoiId] = useState<string | null>(
-    // ?nav= must respect the NAV_ENABLED hold like every other entry point —
-    // otherwise a shared/bookmarked URL draws a route no UI can dismiss.
-    () => (typeof window === "undefined" || !NAV_ENABLED ? null : new URLSearchParams(window.location.search).get("nav")),
+    // ?nav= must respect the navigation hold like every other entry point —
+    // otherwise a shared/bookmarked URL draws a route no UI can dismiss. At
+    // first paint the runtime authorization is whatever verdict is stored
+    // (default-deny); the refresh effect below re-checks the server.
+    () => (typeof window === "undefined" || !NAV_ENABLED || !navAuthCached() ? null : new URLSearchParams(window.location.search).get("nav")),
   );
   // Mid-drive waypoints (POI ids, in order) visited before the destination.
   const [stops, setStops] = useState<string[]>([]);
@@ -202,6 +205,18 @@ export default function App() {
   // to re-trigger the precache effect (a plain state change won't, since its
   // deps are connectivity-only).
   const [cacheNonce, setCacheNonce] = useState(0);
+  // Whether the browser granted persistent storage. Best-effort request, but
+  // the RESULT matters: without it the saved map is evictable, so the "works
+  // offline" claim is qualified and the Home-Screen tip carries real weight.
+  const [persisted, setPersisted] = useState(false);
+  // Runtime navigation authorization (default-deny, expiring — see lib/navAuth).
+  // Compile-time NAV_ENABLED remains the master hold; this is the revocable half.
+  const [navAuthed, setNavAuthed] = useState(() => navAuthCached());
+  const navOn = NAV_ENABLED && navAuthed;
+  // Saved-map durability: persistent storage granted, or installed to the Home
+  // Screen (which WebKit exempts from eviction). Anything else is best-effort,
+  // so the offline claim is softened and the Home-Screen tip shown.
+  const storageDurable = persisted || isStandalone;
 
   // Failsafe: never let the loading splash outstay its welcome if the map's
   // "idle" event is slow (or never fires on a flaky tile fetch).
@@ -326,11 +341,63 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Ask for persistent storage (best-effort) — WebKit favours Home Screen apps
-  // and exempts persistent origins from eviction. Advisory; never blocks.
+  // Ask for persistent storage — WebKit favours Home Screen apps and exempts
+  // persistent origins from eviction. Never blocks, but the verdict drives the
+  // qualified messaging: only a persistent (or installed) origin gets the
+  // unhedged "works offline".
   useEffect(() => {
-    requestPersistentStorage();
+    requestPersistentStorage().then(setPersisted).catch(() => setPersisted(false));
   }, []);
+
+  // Re-validate the saved map whenever it's about to matter: returning to the
+  // foreground (iOS evicts while the app is backgrounded) and the moment
+  // connectivity drops (the last chance to warn honestly). Launch-time and
+  // controllerchange checks exist above; this closes the long-session gap.
+  const lastVerify = useRef(0);
+  useEffect(() => {
+    if (precache.state !== "saved") return;
+    const recheck = () => {
+      if (Date.now() - lastVerify.current < 30_000) return; // visibility+online can fire together
+      lastVerify.current = Date.now();
+      verifyTilesCached().then((ok) => {
+        if (ok) return;
+        invalidateTileCache();
+        precacheStarted.current = false;
+        setPrecache({ state: "idle", pct: 0 });
+        setCacheNonce((n) => n + 1);
+      });
+    };
+    const onVis = () => { if (document.visibilityState === "visible") recheck(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("offline", recheck);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("offline", recheck);
+    };
+  }, [precache.state]);
+
+  // Refresh the navigation authorization on launch and whenever we come back
+  // online. While NAV_ENABLED is false this resolves to false without fetching.
+  useEffect(() => {
+    if (!NAV_ENABLED) return;
+    let cancelled = false;
+    refreshNavAuth(import.meta.env.BASE_URL).then((ok) => { if (!cancelled) setNavAuthed(ok); });
+    return () => { cancelled = true; };
+  }, [online]);
+
+  // If authorization lapses mid-session (revoked or expired), end any active
+  // drive cleanly — otherwise the banner disappears but the route lives on.
+  useEffect(() => {
+    if (navOn || (!driving && !destPoiId && !tour)) return;
+    drivingNav.current = false;
+    tourDriving.current = false;
+    setTour(null);
+    setTourAtStop(false);
+    setDriving(false);
+    setActiveRoute(null);
+    setDestPoiId(null);
+    setStops([]);
+  }, [navOn, driving, destPoiId, tour]);
 
   // Flash "Map saved" on the download bar for a moment once a save we started
   // this session completes (not when tiles were already cached on open).
@@ -608,7 +675,7 @@ export default function App() {
   const poorAccuracy = liveGps && user != null && accuracy != null && accuracy > GOOD_FIX_M;
 
   function navigateTo(p: Poi) {
-    if (!NAV_ENABLED) return; // navigation held for Phase 1 — see reserve.ts NAV_ENABLED
+    if (!navOn) return; // navigation held for Phase 1 — reserve.ts NAV_ENABLED + runtime navAuth
     setDestPoiId(p.id);
     setSelectedPoiId(p.id);
     setTab("explore");
@@ -732,7 +799,7 @@ export default function App() {
   const currentStop = tour ? tour.stops[tourStop] ?? null : null;
 
   function driveToStop(t: Tour, idx: number) {
-    if (!NAV_ENABLED) return; // tours drive the nav/sim engine — held with navigation
+    if (!navOn) return; // tours drive the nav/sim engine — held with navigation
     const stop = t.stops[idx];
     const poi = stop && POIS.find((p) => p.id === stop.poiId);
     if (!poi || !user) return;
@@ -764,7 +831,7 @@ export default function App() {
     setPlaying(true);
   }
   function startTour(t: Tour) {
-    if (!NAV_ENABLED) return; // tours drive the nav/sim engine — held with navigation
+    if (!navOn) return; // tours drive the nav/sim engine — held with navigation
     if (!user) { setToast("Waiting for your location…"); return; }
     setStops([]); // a tour is its own itinerary — drop any custom waypoints
     setTour(t);
@@ -872,6 +939,7 @@ export default function App() {
               saveState={precache.state}
               savePct={precache.pct}
               online={online}
+              durable={storageDurable}
             />
           )}
 
@@ -891,7 +959,7 @@ export default function App() {
               >
                 <i className="status-dot" />
                 {precache.state === "saved"
-                  ? "Map saved · works offline"
+                  ? storageDurable ? "Map saved · works offline" : "Map saved · works offline for now"
                   : precache.state === "saving"
                   ? `Saving map… ${Math.round(precache.pct * 100)}%`
                   : online
@@ -951,7 +1019,7 @@ export default function App() {
           )}
 
           {/* Live navigation banner */}
-          {NAV_ENABLED && destPoi && banner && (
+          {navOn && destPoi && banner && (
             <div className="nav-banner">
               <div className="nav-step">
                 <div className="nav-maneuver">{banner.icon}</div>
@@ -1080,11 +1148,11 @@ export default function App() {
               <div className="poi-pop-title">{openPoi.name}</div>
               <div className="poi-pop-note">{openPoi.blurb}</div>
               {/* Distance is always shown; the navigate/drive actions are held for
-                  Phase 1 (NAV_ENABLED) — see reserve.ts. */}
-              {(user || NAV_ENABLED) && (
+                  Phase 1 (NAV_ENABLED + runtime navAuth) — see reserve.ts. */}
+              {(user || navOn) && (
                 <div className="poi-pop-actions">
                   {user && <span className="poi-pop-dist">{formatDistance(distanceMeters(user, poiWorld(openPoi)))} away</span>}
-                  {NAV_ENABLED &&
+                  {navOn &&
                     (destPoiId && destPoiId !== openPoi.id && !stops.includes(openPoi.id) ? (
                       <>
                         <button
@@ -1175,6 +1243,7 @@ export default function App() {
               <ExploreTab
                 pois={POIS}
                 user={user}
+                navEnabled={navOn}
                 selectedPoiId={selectedPoiId}
                 onSelect={(p) => { setSelectedPoiId(p.id); setOpenPoiId(p.id); }}
                 onNavigate={navigateTo}
@@ -1231,6 +1300,7 @@ function Welcome(props: {
   saveState: "idle" | "saving" | "saved";
   savePct: number;
   online: boolean;
+  durable: boolean;
 }) {
   return (
     <div className="welcome">
@@ -1256,7 +1326,17 @@ function Welcome(props: {
             returning guest sees the map is ready — and the no-signal warning is
             hidden once it's saved, since it no longer applies. */}
         {props.saveState === "saved" ? (
-          <div className="welcome-save-ok">✓ Map saved — works offline</div>
+          <>
+            <div className="welcome-save-ok">✓ Map saved — works offline</div>
+            {/* Honest durability note: without persistent storage (or a Home
+                Screen install) the phone may clear the saved map over time. */}
+            {!props.durable && (
+              <p className="welcome-save-tip">
+                Phones can clear saved data over time — add this page to your Home
+                Screen to keep the map saved.
+              </p>
+            )}
+          </>
         ) : props.saveState === "saving" ? (
           <div className="welcome-save-note">
             <div className="welcome-save-row">
@@ -1406,6 +1486,7 @@ function A2HSHint(props: {
 function ExploreTab(props: {
   pois: Poi[];
   user: LatLng | null;
+  navEnabled: boolean;
   selectedPoiId: string | null;
   onSelect: (p: Poi) => void;
   onNavigate: (p: Poi) => void;
@@ -1424,7 +1505,7 @@ function ExploreTab(props: {
         <span>Places</span>
       </div>
       <p className="hint">
-        {NAV_ENABLED
+        {props.navEnabled
           ? "Tap a place to see it, or navigate there along the reserve tracks."
           : "Tap a place to see it on the map."}
       </p>
@@ -1449,7 +1530,7 @@ function ExploreTab(props: {
           </div>
           <div className="card-side">
             {props.user && <div className="dist">{formatDistance(dist)}</div>}
-            {NAV_ENABLED && (
+            {props.navEnabled && (
               <button
                 className="btn btn-accent sm"
                 onClick={(e) => { e.stopPropagation(); props.onNavigate(poi); }}

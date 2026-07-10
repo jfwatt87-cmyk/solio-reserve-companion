@@ -16,7 +16,7 @@
    Redirect hygiene: Cloudflare 308s ./index.html -> ./ ; a stored *redirected*
    response is rejected when replayed for a navigation, so every cached
    navigation response is normalised (re-wrapped) before it enters the cache. */
-const SHELL_CACHE = "solio-shell-v10";
+const SHELL_CACHE = "solio-shell-v11";
 const TILE_CACHE = "solio-tiles-v4";
 const TILE_PREFIX = "solio-tiles-";
 
@@ -72,6 +72,12 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  // nav-auth.json is an authorization heartbeat (src/lib/navAuth.ts): it must
+  // NEVER be answered from a cache, or a stale "enabled" could outlive its
+  // revocation. Untouched here, it goes straight to the network; offline, the
+  // fetch fails and the app's stored verdict expires on its own TTL.
+  if (url.pathname.endsWith("/nav-auth.json")) return;
 
   // Navigations: network first (fresh releases), cached app shell when offline.
   if (req.mode === "navigate") {
