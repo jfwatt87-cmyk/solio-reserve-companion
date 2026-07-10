@@ -19,3 +19,7 @@ public/tiles-manifest.json
 
 # local deploy artifact
 solio-map-dist.zip
+
+# NEVER commit: raw staff GPS survey (timestamped drive diary + named wildlife tracks)
+# Regenerate locally via tools/gis/export_layers.sh; hash pinned in layers/MANIFEST.sha256
+tools/gis/layers/SolioMappingedited_GPXtoFeatures.geojson
