@@ -10,10 +10,11 @@
    Why split: bumping the shell version must never wipe a guest's saved map.
    activate only deletes caches that belong to neither name, so a shell release
    leaves the tiles untouched, and a tile release (both bumped) re-pulls cleanly. */
-const SHELL_CACHE = "solio-shell-v8";
+const SHELL_CACHE = "solio-shell-v9";
 const TILE_CACHE = "solio-tiles-v4";
 
 const SHELL_ASSETS = [
+  "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
@@ -28,7 +29,22 @@ self.addEventListener("install", (e) => {
   e.waitUntil(
     (async () => {
       const cache = await caches.open(SHELL_CACHE);
-      await cache.addAll(SHELL_ASSETS);
+      for (const asset of SHELL_ASSETS) {
+        const resp = await fetch(asset, { cache: "no-cache" });
+        if (!resp.ok) throw new Error(`shell precache ${asset}: ${resp.status}`);
+        // Cloudflare 308s ./index.html -> ./ — a stored *redirected* response
+        // is rejected when replayed for an offline navigation, so re-wrap it.
+        await cache.put(
+          asset,
+          resp.redirected
+            ? new Response(await resp.blob(), {
+                status: resp.status,
+                statusText: resp.statusText,
+                headers: resp.headers,
+              })
+            : resp,
+        );
+      }
       await self.skipWaiting();
     })(),
   );
