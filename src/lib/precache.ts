@@ -3,20 +3,29 @@
  * Phase 1's headline promise is "works with no signal". The service worker caches
  * tiles as they're viewed, but a guest who scans at the gate (signal) and drives
  * into a dead zone only has the tiles they happened to pan across. The whole
- * pyramid is ~14 MB — small enough to pull down in the background after first
+ * pyramid is ~12 MB — small enough to pull down in the background after first
  * load, so the entire reserve is available offline.
  *
- * Mechanism: we simply fetch() each tile from the page. The service worker's
- * fetch handler intercepts same-origin GETs and puts them in its cache, so a
- * plain fetch loop populates the offline store with no SW messaging. Low zooms
- * come first; the heavy z16 layer is best-effort, so an iOS cache-quota eviction
- * still leaves usable coverage (the spec's z11–14 fallback).
+ * Honesty contract: "saved" is only ever declared after every tile fetch
+ * SUCCEEDED (failures are retried, then reported) AND Cache Storage actually
+ * contains the pyramid. A guest must never see "works offline" over a cache
+ * with holes.
  */
 
 export type PrecacheProgress = { done: number; total: number };
+export type PrecacheResult = {
+  /** Every tile is verified present in Cache Storage. */
+  saved: boolean;
+  /** The run was cancelled via the AbortSignal (saved is false). */
+  aborted: boolean;
+  done: number;
+  total: number;
+};
 type Manifest = { count: number; bytes: number; byZoom: Record<string, string[]> };
 
-// Bump alongside sw.js CACHE when the tiles change, so phones re-pull the pyramid.
+// The Cache Storage bucket the tiles live in. MUST equal TILE_CACHE in
+// public/sw.js — the prebuild step fails the build if they diverge. Bump both
+// ONLY when the tile pyramid changes, so phones re-pull it.
 export const TILE_CACHE_TAG = "solio-tiles-v4";
 
 const CACHED_KEY = "solio-tiles-cached";
@@ -113,16 +122,24 @@ export async function requestPersistentStorage(): Promise<boolean> {
 }
 
 /**
- * Pull the whole tile pyramid into the SW cache. Resolves when every tile has
- * been attempted (failures are swallowed — a missing tile must never break the
- * app). `onProgress` fires roughly every 15 tiles. Aborts cleanly via `signal`.
+ * Pull the whole tile pyramid into Cache Storage, writing each verified image
+ * response into TILE_CACHE ourselves (we do not rely on the service worker's
+ * fetch handler for correctness — it merely also serves these entries later).
+ *
+ * - Failed tiles are queued and retried (2 extra passes) before giving up.
+ * - `saved: true` (and the persistent flag) only after zero outstanding
+ *   failures AND a Cache Storage count check.
+ * - Abort stops promptly (the signal is passed to fetch) and reports
+ *   `aborted: true`; the caller decides how to resume.
+ * - Never throws for per-tile problems; throws only if the manifest itself is
+ *   unavailable or Cache Storage is unusable.
  */
 export async function precacheTiles(
   base: string,
   onProgress: (p: PrecacheProgress) => void,
   signal?: AbortSignal,
-): Promise<void> {
-  const res = await fetch(base + "tiles-manifest.json", { cache: "no-cache" });
+): Promise<PrecacheResult> {
+  const res = await fetch(base + "tiles-manifest.json", { cache: "no-cache", signal });
   if (!res.ok) throw new Error("tile manifest unavailable");
   const manifest = (await res.json()) as Manifest;
 
@@ -133,28 +150,67 @@ export async function precacheTiles(
   }
 
   const total = urls.length;
+  const cache = await caches.open(TILE_CACHE_TAG);
   let done = 0;
-  let cursor = 0;
-  const CONCURRENCY = 6;
+  const report = () => onProgress({ done, total });
 
-  async function worker() {
-    while (cursor < urls.length) {
-      if (signal?.aborted) return;
-      const url = urls[cursor++];
-      try {
-        await fetch(url); // SW intercepts + caches; response body ignored
-      } catch {
-        /* offline / transient — skip, the on-view handler catches it later */
+  async function fetchInto(url: string): Promise<boolean> {
+    // Already cached (previous partial run / panned-over tile): count it, skip.
+    if (await cache.match(url)) return true;
+    const resp = await fetch(url, { cache: "no-cache", signal });
+    const type = resp.headers.get("content-type") || "";
+    // Only a real image may enter the cache — an SPA-fallback/error page that
+    // returns 200 text/html must count as a FAILURE, not a saved tile.
+    if (!resp.ok || !type.startsWith("image/")) return false;
+    await cache.put(url, resp);
+    return true;
+  }
+
+  async function pass(list: string[]): Promise<string[]> {
+    const failed: string[] = [];
+    let cursor = 0;
+    const CONCURRENCY = 6;
+    async function worker() {
+      while (cursor < list.length) {
+        if (signal?.aborted) return;
+        const url = list[cursor++];
+        let ok = false;
+        try {
+          ok = await fetchInto(url);
+        } catch (err) {
+          if ((err as Error).name === "AbortError") return;
+          ok = false;
+        }
+        if (ok) {
+          done++;
+          if (done % 15 === 0 || done === total) report();
+        } else {
+          failed.push(url);
+        }
       }
-      done++;
-      if (done % 15 === 0 || done === total) onProgress({ done, total });
     }
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    return failed;
   }
 
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  if (!signal?.aborted) {
-    onProgress({ done: total, total });
-    saveSample(urls);
-    markCached();
+  let pending = urls;
+  for (let attempt = 0; attempt < 3 && pending.length > 0; attempt++) {
+    if (signal?.aborted) break;
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt));
+    pending = await pass(pending);
   }
+
+  if (signal?.aborted) return { saved: false, aborted: true, done, total };
+  if (pending.length > 0) return { saved: false, aborted: false, done, total };
+
+  // Belt and braces: the flag is only persisted if Cache Storage really holds
+  // the pyramid (>= because the manifest itself may share the cache).
+  const keys = await cache.keys();
+  const tileKeys = keys.filter((k) => new URL(k.url).pathname.includes("/tiles/")).length;
+  if (tileKeys < total) return { saved: false, aborted: false, done, total };
+
+  report();
+  saveSample(urls);
+  markCached();
+  return { saved: true, aborted: false, done: total, total };
 }
