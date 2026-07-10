@@ -13,7 +13,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("App error:", error, info.componentStack);
+    if (import.meta.env.DEV) console.error("App error:", error, info.componentStack);
+    else console.error("App error");
   }
 
   render() {
@@ -25,7 +26,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
             <h2>Something went wrong</h2>
             <p>The app hit an unexpected problem. Reloading usually fixes it.</p>
             <button className="btn btn-accent block" onClick={() => location.reload()}>Reload</button>
-            <pre className="error-detail">{String(this.state.error?.message ?? this.state.error)}</pre>
+            {import.meta.env.DEV && (
+              <pre className="error-detail">{String(this.state.error?.message ?? this.state.error)}</pre>
+            )}
           </div>
         </div>
       );

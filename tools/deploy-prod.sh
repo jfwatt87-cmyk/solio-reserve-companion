@@ -28,6 +28,18 @@ npm run build
 echo "deploy:prod: deploying dist/ to Cloudflare Pages project solio-reserve-map…"
 env -u CLOUDFLARE_API_TOKEN npx wrangler pages deploy dist --project-name solio-reserve-map
 
+sha=$(git rev-parse --short HEAD)
 echo
-echo "deploy:prod: done. NOW: verify map.soliogamereserve.org (and the GH mirror"
-echo "after pushing), then tag: git tag release-$(date +%Y%m%d)-$(git rev-parse --short HEAD) && git push --tags"
+echo "deploy:prod: verifying the primary serves this build (version.json)…"
+for i in 1 2 3; do
+  live=$(curl -s --max-time 10 "https://map.soliogamereserve.org/version.json" | sed -n 's/.*"sha":"\([^"]*\)".*/\1/p')
+  [ "$live" = "$sha" ] && break
+  sleep 10
+done
+if [ "$live" = "$sha" ]; then
+  echo "deploy:prod: PRIMARY VERIFIED — serving $live"
+else
+  echo "deploy:prod: WARNING — primary reports '$live', expected '$sha' (propagation lag? investigate before tagging)" >&2
+fi
+echo "deploy:prod: NOW verify the GH mirror serves the same sha after pushing,"
+echo "then tag: git tag release-$(date +%Y%m%d)-$sha && git push --tags"
