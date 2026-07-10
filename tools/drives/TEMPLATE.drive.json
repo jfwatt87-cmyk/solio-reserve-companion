@@ -1,0 +1,13 @@
+{
+  "_comment": "PHASE 2 Module C — one file per real drive from Callan. Stops are existing POI ids (src/data/pois.ts) or {name, lat, lng} pins. Ingestion snaps pins to the road network and regenerates the tours list; gate with npm run test:roads. Drives ship browse-only until NAV_ENABLED.",
+  "id": "example-river-drive",
+  "name": "River Drive",
+  "blurb": "One-line guest-facing description from Callan.",
+  "durationMin": 90,
+  "stops": [
+    "gate",
+    { "name": "Hippo Pools", "lat": -0.2, "lng": 36.9 },
+    "orphanage"
+  ],
+  "gpxTrace": "optional-recorded-drive.gpx (evidence only, never geometry)"
+}

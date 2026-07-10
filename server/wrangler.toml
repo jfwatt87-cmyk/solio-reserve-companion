@@ -1,0 +1,12 @@
+# Solio live-tracking Worker — PHASE 2 SCAFFOLD. Not deployed.
+# Deploy (when Module B is agreed) from server/:
+#   env -u CLOUDFLARE_API_TOKEN npx wrangler deploy        # Solio account!
+# then create the KV namespace and paste its id below:
+#   env -u CLOUDFLARE_API_TOKEN npx wrangler kv namespace create TRACK
+name = "solio-tracking"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+[[kv_namespaces]]
+binding = "TRACK"
+id = "TODO-create-on-activation"
