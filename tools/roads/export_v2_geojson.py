@@ -21,7 +21,7 @@ ROOT = HERE.parents[1]
 
 # corner georef — must mirror src/data/reserve.ts (validated by import_gis_roads)
 LNG0, LNG1, LAT0, LAT1, IW, IH = 36.849258, 37.002478, -0.090041, -0.305231, 2400, 3601
-MLAT = 111320.0
+MLAT = 110574.0  # metres per degree latitude (WGS84); 111,320 is the LONGITUDE figure
 MLNG = 111320.0 * math.cos(math.radians(-0.1975))
 
 
@@ -50,14 +50,23 @@ def segs_cross(p1, p2, p3, p4) -> bool:
     return o(p1, p2, p3) != o(p1, p2, p4) and o(p3, p4, p1) != o(p3, p4, p2)
 
 
-def load_lines(path: Path) -> list[list[tuple[float, float]]]:
+def seg_seg_m(p1, p2, p3, p4) -> float:
+    """Min distance in metres between two segments (0 if they cross)."""
+    if segs_cross(p1, p2, p3, p4):
+        return 0.0
+    return min(seg_point_m(p1, p3, p4), seg_point_m(p2, p3, p4),
+               seg_point_m(p3, p1, p2), seg_point_m(p4, p1, p2))
+
+
+def load_lines(path: Path) -> list[tuple[list[tuple[float, float]], dict]]:
     out = []
     for f in json.load(open(path))["features"]:
         g = f["geometry"]
+        props = f.get("properties") or {}
         if g["type"] == "LineString":
-            out.append([tuple(c) for c in g["coordinates"]])
+            out.append(([tuple(c) for c in g["coordinates"]], props))
         elif g["type"] == "MultiLineString":
-            out += [[tuple(c) for c in part] for part in g["coordinates"]]
+            out += [([tuple(c) for c in part], props) for part in g["coordinates"]]
     return out
 
 
@@ -80,25 +89,23 @@ def main() -> None:
         length = sum(dist_m(p, q) for p, q in zip(pts, pts[1:]))
 
         near = sum(1 for p in pts if any(
-            seg_point_m(p, c[j], c[j + 1]) < 25 for c in connectors for j in range(len(c) - 1)))
+            seg_point_m(p, c[j], c[j + 1]) < 25 for c, _ in connectors for j in range(len(c) - 1)))
         source = "manual_connector" if near >= max(2, round(len(pts) * 0.3)) else "poster_trace"
 
-        # realises an unconfirmed join if it crosses the join line OR passes
-        # within 15 m of it (seam-healed joins live inside edges, not on nodes)
-        status = "ok"
-        for bl in blockers:
-            crossed = any(segs_cross(pts[j], pts[j + 1], bl[k], bl[k + 1])
-                          for j in range(len(pts) - 1) for k in range(len(bl) - 1))
-            close = any(seg_point_m(q, bl[k], bl[k + 1]) < 15
-                        for q in pts for k in range(len(bl) - 1))
-            if crossed or close:
-                status = "unconfirmed_crossing"
+        # realises an unconfirmed join if any SEGMENT of it crosses or runs
+        # within 15 m of the join line (vertex-only tests miss simplified edges)
+        status, site = "ok", None
+        for bl, bprops in blockers:
+            if any(seg_seg_m(pts[j], pts[j + 1], bl[k], bl[k + 1]) < 15
+                   for j in range(len(pts) - 1) for k in range(len(bl) - 1)):
+                status, site = "unconfirmed_crossing", bprops.get("site")
                 break
         n_conn += source == "manual_connector"
         n_unc += status == "unconfirmed_crossing"
-        feats.append({"type": "Feature",
-                      "properties": {"id": i, "length_m": round(length, 1),
-                                     "source": source, "status": status},
+        props = {"id": i, "length_m": round(length, 1), "source": source, "status": status}
+        if site:
+            props["site"] = site
+        feats.append({"type": "Feature", "properties": props,
                       "geometry": {"type": "LineString", "coordinates": [list(p) for p in pts]}})
 
     fc = {"type": "FeatureCollection",

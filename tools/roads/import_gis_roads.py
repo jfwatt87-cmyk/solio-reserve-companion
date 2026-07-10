@@ -462,6 +462,53 @@ def dedupe_parallel_edges(edges: list[dict]) -> list[dict]:
     return out
 
 
+def dedupe_same_corridor(edges: list[dict], tol_m: float = 15.0) -> list[dict]:
+    """After chain-merge, the double-drawn poster corridors surface as two (or
+    three) edges between the same junction pair whose geometry runs the same
+    physical road. The stub-level length heuristic can't catch these (short
+    parallel stubs differ >1.2x in length from snap noise), so test geometry:
+    drop the longer edge of a same-endpoints pair iff EVERY point of it lies
+    within tol_m of the kept edge — a genuine second road (loop) diverges."""
+
+    def seg_point_m(p, a, b) -> float:
+        ax, ay = a[0] * M_PER_DEG_LNG, a[1] * M_PER_DEG_LAT
+        bx, by = b[0] * M_PER_DEG_LNG, b[1] * M_PER_DEG_LAT
+        px_, py_ = p[0] * M_PER_DEG_LNG, p[1] * M_PER_DEG_LAT
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px_ - ax) * dx + (py_ - ay) * dy) / L2))
+        return math.hypot(px_ - (ax + t * dx), py_ - (ay + t * dy))
+
+    def within_corridor(cand: dict, kept: dict) -> bool:
+        kp = kept["pts"]
+        return all(
+            min(seg_point_m(p, kp[j], kp[j + 1]) for j in range(len(kp) - 1)) <= tol_m
+            for p in cand["pts"]
+        )
+
+    by_pair: dict[frozenset, list[dict]] = {}
+    loops: list[dict] = []
+    for e in edges:
+        if e["a"] == e["b"]:
+            loops.append(e)
+        else:
+            by_pair.setdefault(frozenset((e["a"], e["b"])), []).append(e)
+    out: list[dict] = list(loops)
+    dropped = 0
+    for group in by_pair.values():
+        group = sorted(group, key=_edge_len)
+        keep = [group[0]]
+        for e in group[1:]:
+            if any(within_corridor(e, k) for k in keep):
+                dropped += 1
+            else:
+                keep.append(e)
+        out.extend(keep)
+    if dropped:
+        print(f"  corridor-deduped {dropped} duplicate parallel edge(s)")
+    return out
+
+
 def merge_chains(
     nodes: list[tuple[float, float]], edges: list[dict], simplify_m: float
 ) -> tuple[list[tuple[float, float]], list[dict]]:
@@ -588,7 +635,15 @@ def main() -> None:
     _stage("parallels deduped")
     if args.simplify >= 0:
         nodes, edges = merge_chains(nodes, edges, args.simplify)
-        _stage("chains merged")
+        # double-drawn corridors survive as same-endpoints parallels; dropping
+        # them frees new degree-2 chains, so dedupe+merge until stable
+        while True:
+            before = len(edges)
+            edges = dedupe_same_corridor(edges)
+            if len(edges) == before:
+                break
+            nodes, edges = merge_chains(nodes, edges, args.simplify)
+        _stage("chains merged + corridors deduped")
     print(f"read {len(lines)} centreline(s) -> {len(nodes)} node(s), {len(edges)} edge(s)")
 
     # bind POI ids onto the nearest road edge (splitting mid-segment as needed)
