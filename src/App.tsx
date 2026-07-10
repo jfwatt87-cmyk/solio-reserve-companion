@@ -50,9 +50,25 @@ const IS_IOS = /iPad|iPhone|iPod/.test(UA) || (/Macintosh/.test(UA) && typeof do
 
 export default function App() {
   const georef = useMemo(() => createGeoReference(), []);
-  const network = useMemo(() => createRoadNetwork(), []);
+  // Lazy routing graph: building it (thousands of nodes, per-segment haversine)
+  // costs real main-thread time on low-end phones, and a guest with navigation
+  // held (NAV_ENABLED=false, no ?demo) never routes at all — so the graph is
+  // constructed on the first actual call, not at startup.
+  const network = useMemo(() => {
+    type Net = ReturnType<typeof createRoadNetwork>;
+    let real: Net | null = null;
+    const get = () => (real ??= createRoadNetwork());
+    return {
+      route: (...args: Parameters<Net["route"]>) => get().route(...args),
+      alternatives: (...args: Parameters<Net["alternatives"]>) => get().alternatives(...args),
+      nearestNode: (...args: Parameters<Net["nearestNode"]>) => get().nearestNode(...args),
+    };
+  }, []);
 
   const patrolPath = useMemo<LatLng[]>(() => {
+    // Demo-only: the sim patrol is unreachable in guest mode, so don't pay for
+    // routing its legs (which would force the lazy graph to build) at startup.
+    if (!IS_DEMO) return [];
     // Waypoints present in the active network (GIS imports may name junctions
     // differently); route every leg on-road, falling back to the node points.
     const ids = PATROL.filter((id) => NODE_PIXEL.has(id));

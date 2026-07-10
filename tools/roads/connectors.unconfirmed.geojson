@@ -1,0 +1,29 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "",
+    "surface": "dirt",
+    "source": "bridge-manual",
+    "fix": "jw-bridge",
+    "evidence": "Crossing W of JW (12): gate->jw 10.1->6.5 km",
+    "note": "Crossing at site S20 \u2014 UNCONFIRMED by any recorded drive (artwork evidence only). Re-add to connectors.bridges.geojson when Callan confirms S20."
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.89600036232988,
+      -0.20430190800347442
+     ],
+     [
+      36.897165302306796,
+      -0.20400661555417257
+     ]
+    ]
+   }
+  }
+ ]
+}

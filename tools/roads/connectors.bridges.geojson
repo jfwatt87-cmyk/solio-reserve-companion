@@ -7,29 +7,6 @@
     "name": "",
     "surface": "dirt",
     "source": "bridge-manual",
-    "fix": "jw-bridge",
-    "evidence": "Crossing W of JW (12): gate->jw 10.1->6.5 km"
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.89600036232988,
-      -0.20430190800347442
-     ],
-     [
-      36.897165302306796,
-      -0.20400661555417257
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "name": "",
-    "surface": "dirt",
-    "source": "bridge-manual",
     "fix": "tharua-bridge",
     "evidence": "Tharua Bridge (1): kingfisher->east halved"
    },
