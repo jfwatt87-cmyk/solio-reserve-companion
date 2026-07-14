@@ -43,7 +43,7 @@ def main() -> None:
          str(HERE / "poster_roads.geojson"),
          "--connectors", str(HERE / "connectors.bridges.geojson"),
          "--block", str(HERE / "blockers.unconfirmed-crossings.geojson"),
-         "--block", str(HERE / "blockers.private-access.geojson"),
+         "--block", str(HERE / "blockers.permanent.geojson"),
          "--out", str(out)],
         capture_output=True, text=True, cwd=ROOT)
     check("importer runs", proc.returncode == 0, f"exit {proc.returncode}")
@@ -113,9 +113,11 @@ def main() -> None:
     #    different thing, so they must not share a verdict.
     import json
 
-    def blocker_leaks(fname: str) -> int:
+    def blocker_leaks(fname: str, reason: str | None = None) -> int:
         n = 0
         for f in json.load(open(HERE / fname))["features"]:
+            if reason and f["properties"].get("reason") != reason:
+                continue
             cs = [tuple(c) for c in f["geometry"]["coordinates"]]
             for a, b, via in edges:
                 pts = edge_pts(a, b, via)
@@ -132,9 +134,16 @@ def main() -> None:
     # the whole private drive is unreachable — we have no geometry for the drive
     # itself, and JW Marriott is a guest POI that must stay reachable. Do not
     # rename this to "private access closed"; it would claim more than it checks.
-    priv = blocker_leaks("blockers.private-access.geojson")
+    priv = blocker_leaks("blockers.permanent.geojson", "private-access")
     check("private crossings not traversed", priv == 0,
           f"{priv} edges cross the Marriotts private crossings")
+
+    # S05 Kingfisher Dam: Callan confirmed it's an end point, so there is no
+    # crossing to route over. Separate from the private check — same outcome,
+    # different fact, and a failure here would mean something quite different.
+    nox = blocker_leaks("blockers.permanent.geojson", "no-crossing")
+    check("no phantom crossings routed", nox == 0,
+          f"{nox} edges cross a crossing that does not exist")
 
     # 7. every bound POI reachable from the gate
     dist = dijkstra(adj, "gate")
