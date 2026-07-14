@@ -8,8 +8,16 @@ Each edge becomes one LineString with:
   id           edge index
   length_m     edge length
   source       poster_trace | manual_connector (verified/drawn bridge decks)
-  status       ok | unconfirmed_crossing (realises a join at one of the
-               7 unconfirmed crossing sites — see the sent fix-list pack)
+  status       ok
+               | unconfirmed_crossing      — realises a join at a crossing still
+                 awaiting Solio's confirmation (S05, S22)
+               | private_no_guest_routing  — the Marriotts private road (S18/S20):
+                 real, confirmed, but closed to guests by agreement (D80)
+  site         the crossing site id, when status is not ok
+
+The last two must never be collapsed into one status: "unconfirmed" is an open
+question that may resolve to a normal road, "private" is a standing decision that
+must not. Publishing a private road as `ok` is the failure this guards against.
 """
 from __future__ import annotations
 
@@ -78,10 +86,18 @@ def main() -> None:
              for m in re.finditer(r'\{ id: "([^"]+)", pixel: \{ x: ([\d.]+), y: ([\d.]+) \} \}', src)}
     connectors = (load_lines(HERE / "connectors.bridges.geojson")
                   + load_lines(HERE / "connectors.unconfirmed.geojson"))
-    blockers = load_lines(HERE / "blockers.unconfirmed-crossings.geojson")
+    # Two blocker files, two MEANINGS — and they must stay distinguishable in the
+    # export. "unconfirmed" is an open question that may yet resolve to a normal
+    # road; "private" is a standing access decision that never does. Collapsing
+    # them (or reading only the first) would publish the Marriotts private road to
+    # Callan as a plain drivable road. See Decisions Log D80.
+    blockers = [(l, p, "unconfirmed_crossing")
+                for l, p in load_lines(HERE / "blockers.unconfirmed-crossings.geojson")]
+    blockers += [(l, p, "private_no_guest_routing")
+                 for l, p in load_lines(HERE / "blockers.private-access.geojson")]
 
     feats = []
-    n_conn = n_unc = 0
+    n_conn = n_unc = n_priv = 0
     for i, m in enumerate(re.finditer(r'\{\s*a: "([^"]+)",\s*b: "([^"]+)",(.*?)\n  \},', src, re.S)):
         a, b, body = m.group(1), m.group(2), m.group(3)
         via = [px_world(float(x), float(y)) for x, y in re.findall(r"\{ x: ([\d.]+), y: ([\d.]+) \}", body)]
@@ -95,13 +111,14 @@ def main() -> None:
         # realises an unconfirmed join if any SEGMENT of it crosses or runs
         # within 15 m of the join line (vertex-only tests miss simplified edges)
         status, site = "ok", None
-        for bl, bprops in blockers:
+        for bl, bprops, bstatus in blockers:
             if any(seg_seg_m(pts[j], pts[j + 1], bl[k], bl[k + 1]) < 15
                    for j in range(len(pts) - 1) for k in range(len(bl) - 1)):
-                status, site = "unconfirmed_crossing", bprops.get("site")
+                status, site = bstatus, bprops.get("site")
                 break
         n_conn += source == "manual_connector"
         n_unc += status == "unconfirmed_crossing"
+        n_priv += status == "private_no_guest_routing"
         props = {"id": i, "length_m": round(length, 1), "source": source, "status": status}
         if site:
             props["site"] = site
@@ -112,15 +129,20 @@ def main() -> None:
           "name": "Solio_Roads_V2_WGS84",
           "description": ("Solio road network v2 — traced from the printed reserve map, "
                           "georeferenced, noded and simplified. source=manual_connector marks "
-                          "drawn bridge decks added by hand; status=unconfirmed_crossing marks "
-                          "edges over the 7 crossing places awaiting confirmation "
-                          "(see 4-joins-to-confirm.geojson in the fix-list pack)."),
+                          "drawn bridge decks added by hand. status=unconfirmed_crossing marks "
+                          "edges over a crossing still awaiting confirmation (S05 Kingfisher Dam, "
+                          "S22 orphanage corner). status=private_no_guest_routing marks the "
+                          "Marriotts private road (S18/S20) — confirmed real, but closed to guest "
+                          "routing at Solio's request (2026-07-14); the app will not route a guest "
+                          "onto it. Crossings S06, S16 and S21 were confirmed by Solio on "
+                          "2026-07-14 and are now status=ok."),
           "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
           "features": feats}
     out_path.write_text(json.dumps(fc))
     total = sum(f["properties"]["length_m"] for f in feats)
     print(f"wrote {out_path}: {len(feats)} edges, {total/1000:.1f} km total; "
-          f"{n_conn} connector edges, {n_unc} unconfirmed-crossing edges")
+          f"{n_conn} connector edges, {n_unc} unconfirmed-crossing edges, "
+          f"{n_priv} private-road edges (no guest routing)")
 
 
 if __name__ == "__main__":
