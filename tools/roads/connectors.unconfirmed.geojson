@@ -9,7 +9,9 @@
     "source": "bridge-manual",
     "fix": "jw-bridge",
     "evidence": "Crossing W of JW (12): gate->jw 10.1->6.5 km",
-    "note": "Crossing at site S20 \u2014 UNCONFIRMED by any recorded drive (artwork evidence only). Re-add to connectors.bridges.geojson when Callan confirms S20."
+    "note": "DO NOT RE-ADD for guest routing. Site S20 is confirmed real by Callan (WhatsApp 2026-07-14) \u2014 but it is the Marriotts PRIVATE road, and guest access there is closed off by agreement (Callan proposed, James agreed, 2026-07-14). The old note said 're-add when Callan confirms S20'; he has now confirmed it, and re-adding is exactly the wrong move. See blockers.private-access.geojson + Decisions Log D80.",
+    "access": "private",
+    "guest_routable": false
    },
    "geometry": {
     "type": "LineString",

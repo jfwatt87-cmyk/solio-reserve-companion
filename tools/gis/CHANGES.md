@@ -1,7 +1,11 @@
 # Road network v2 — change log vs Callan's delivered data (2026-07-09)
 
-Branch `fix/road-connectivity`. Production still runs the v1 GIS import with
-navigation OFF (`NAV_ENABLED=false`). Nothing here is deployed.
+**Header corrected 2026-07-14** — it said "branch `fix/road-connectivity`, production still runs
+the v1 GIS import, nothing here is deployed". All three were stale: the work landed on `main`
+(D76), and production has run the safe-mode v2 network since then. Navigation remains OFF
+(`NAV_ENABLED=false`), and with `SHOW_ROADS=false` too, `roads.gis.ts` is **inert in the shipped
+app** — neither drawn nor routed over. Roads releases are therefore not guest-visible; they exist
+so the data is true on the day nav flips on.
 
 **Restore path:** `backups/2026-07-09-pre-connectivity/roads.gis.ts` (v1 shipped file),
 or `git checkout main -- src/data/roads.gis.ts`. Originals in `tools/gis/SOURCES.md`.
@@ -126,6 +130,76 @@ route over ANY unconfirmed river crossing.
   `python3 tools/roads/import_gis_roads.py tools/roads/poster_roads.geojson \
      --connectors tools/roads/connectors.bridges.geojson \
      --block tools/roads/blockers.unconfirmed-crossings.geojson`
+
+## Callan's site answers applied — blockers 22 -> 19 (2026-07-14)
+Callan replied on WhatsApp to the 7-site confirm pass, answering 6. **Only the
+three his reply settles outright are unblocked**; the rest stay cut, because he
+told us *what each place is*, which is not always the same as *you can drive it*.
+
+| Site | Callan's words | Applied |
+|------|----------------|---------|
+| S06 | "Crossing" | **unblocked** — crossing confirmed. Name NOT confirmed: the "Browns Bridge" guess is dropped, not proven (he never said Browns). |
+| S16 | "Part of the Mount Kenya River Road" | **unblocked** |
+| S21 | "Orphanage Road - Looks good" | **unblocked** — and our "likely Waterbuck Bridge" guess was WRONG. Waterbuck is now unlocated. |
+| S18, S20 | "Marriotts Private Road - May be a good idea to restrict access here" | **stays blocked.** Crossings are real (`site_confirmed=true`, `access=private`) but he's asking to keep guests off, so confirming them must not silently route guests down a private road. `guest_routable=false`. Needs a firm yes/no — "may be a good idea" is a suggestion. The parked `jw-bridge` connector stays parked. |
+| S05 | "Dam" | **stays blocked.** A dam is not a bridge; whether the road crosses the wall is still open. |
+| S22 | *(no answer)* | stays blocked, untouched. |
+
+- Per-join `confidence` deliberately **unchanged**. Callan confirmed each SITE is
+  real — not which of our candidate join lines is the actual centreline (S20
+  alone has 8). Site truth and join-geometry truth are different claims.
+- Each remaining blocker now carries `still_blocked_because` so the reason
+  survives without this file.
+- **Result: safe mode's cost is now nil.** The three ~+20% kingfisher regressions
+  above are exactly what S06/S16/S21 recovered: kingfisher->naribo 9.18 -> 7.58 km,
+  kingfisher->yellowthorn 7.33 -> 6.18 km, rhinogate->kingfisher 10.95 -> 9.36 km.
+  Avg detour 1.52 -> **1.49**. gate->orphanage holds at 2.43 km. All 9 invariants
+  pass incl. "safe mode holds: 0 edges cross a blocker"; `tsc --noEmit` clean.
+- Not deployed. `NAV_ENABLED` remains `false`.
+
+## Marriotts private road CLOSED to guests — blockers split (2026-07-14)
+Callan proposed restricting access at S18/S20; James agreed. **The network output
+is byte-identical (sha `a8b66226…`) — those joins were already cut.** What changed
+is *why*, and whether it survives:
+
+- **The bug this fixes:** S18/S20 were sitting in
+  `blockers.unconfirmed-crossings.geojson`, a file that means "data gap — re-add
+  once Callan confirms". Callan has now *confirmed* both. Left there, the next
+  person to clear the unconfirmed list would have obediently unblocked a private
+  road and started routing guests past JW. A standing access decision cannot live
+  in a file whose whole semantic is "temporary".
+- **New file `tools/roads/blockers.private-access.geojson`** (11 joins, S18+S20) —
+  policy, permanent, `reason=private-access`. Unconfirmed list drops to **8**
+  (S05×5, S22×3) and now contains only genuine data gaps. 19 blocked either way.
+- `connectors.unconfirmed.geojson`'s parked `jw-bridge` note said *"re-add when
+  Callan confirms S20"* — now inverted to **DO NOT RE-ADD**, since the trigger it
+  named has fired and the correct response is the opposite of what it advised.
+- **Invariant split in two:** "safe mode holds" (unconfirmed) and **"private
+  access closed"** (policy). They fail for different reasons and must not share a
+  verdict — one is expected to clear when Callan answers, the other never is.
+  `test_network_invariants.py` passes both blocker files to the importer.
+- Regenerate (BOTH `--block` files now — dropping the second silently reopens the
+  private road):
+  `python3 tools/roads/import_gis_roads.py tools/roads/poster_roads.geojson \
+     --connectors tools/roads/connectors.bridges.geojson \
+     --block tools/roads/blockers.unconfirmed-crossings.geojson \
+     --block tools/roads/blockers.private-access.geojson`
+
+## S05 resolved — Kingfisher Dam, not a crossing (2026-07-14)
+Asked whether the road crosses the dam wall, Callan said: *"Yeah - you can drive to a sort of
+view point/pick nic spot"* and *"I'd say the road is pretty accurate on the map"*.
+
+- **"drive TO", not "drive ACROSS"** — a destination, not a through-route. The leading "Yeah"
+  is the trap: banked as a yes, it would have routed guests over a dam wall.
+- **Measured, independently of the wording:** opening S05 changes **zero POI routes**, keeps
+  nodes/edges identical (355/446) and leaves the structure within 400 m of the dam unchanged
+  (same single dead-end spur `g226`). The crossing is not load-bearing — **blocking it is free**.
+- S05 sits 314 m from the **Kingfisher Dam** POI, which already routes fine (gate→16.18 km).
+  Guests can already reach the dam; only the river hop is cut.
+- **Stays in `blockers.unconfirmed-crossings.geojson`, NOT moved to private-access.** The
+  distinction matters: if someone ever confirms a real crossing here, unblocking is the RIGHT
+  response — the opposite of S18/S20. Tagged `ask_status=resolved` so nobody spends another ask.
+- Network sha unchanged `a8b66226…`; all 10 invariants pass.
 
 ## Known trade-offs / follow-ups
 - Emitted file ~530 KB (v1: 69 KB) — bundle 1.53 MB (was 1.25 MB). Needs a

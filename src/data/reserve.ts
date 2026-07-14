@@ -44,6 +44,17 @@ export const SHOW_BOUNDARY = false;
 // build; flip this back to `true` once Callan's roads layer is repaired (bridges
 // noded, lodge access tracks added) and routes verify as direct. The robust parts
 // (live map, GPS dot, drawn roads, tap-a-place for distance) are unaffected.
+//
+// BEFORE FLIPPING THIS ON — the Marriotts private road (D80/D82). Solio asked us to
+// keep guests off it. Today that is satisfied for free: the S18/S20 crossings are cut,
+// so the drive survives only as three dead-end spurs, and nothing routes to them
+// because the app routes to POIs and the corridor's only POI is JW Marriott — a lodge
+// that must stay reachable. Turning nav on is what makes that reasoning load-bearing,
+// so re-check it here: guests must be able to navigate TO JW Marriott, but must never
+// be routed THROUGH the corridor or nudged onto a spur that dead-ends at the river.
+// Parked deliberately at James's call (2026-07-14): it is a nav-time question, not a
+// roads-data one. Closing the drive outright needs Callan to identify which roads ARE
+// the drive — we have geometry for two crossings on it, not for the road itself.
 export const NAV_ENABLED = false;
 
 /**

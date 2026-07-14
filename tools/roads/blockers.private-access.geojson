@@ -1,0 +1,282 @@
+{
+ "type": "FeatureCollection",
+ "name": "Solio_Blockers_PrivateAccess",
+ "crs": null,
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 30.4,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.897536,
+      -0.203856
+     ],
+     [
+      36.89756,
+      -0.203583
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S18",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 30.7,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.892313,
+      -0.202914
+     ],
+     [
+      36.892369,
+      -0.202644
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 33.7,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898627,
+      -0.204042
+     ],
+     [
+      36.898521,
+      -0.203758
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 14.0,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.900252,
+      -0.203695
+     ],
+     [
+      36.900295,
+      -0.203577
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 33.5,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.899402,
+      -0.203743
+     ],
+     [
+      36.89913,
+      -0.203872
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 37.2,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898524,
+      -0.203728
+     ],
+     [
+      36.898553,
+      -0.203395
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 58.6,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.899081,
+      -0.203319
+     ],
+     [
+      36.898556,
+      -0.203365
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S18",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 79.5,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.891601,
+      -0.203249
+     ],
+     [
+      36.892314,
+      -0.20328
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S18",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 81.2,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.891598,
+      -0.203279
+     ],
+     [
+      36.892273,
+      -0.203002
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 51.3,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.900177,
+      -0.204177
+     ],
+     [
+      36.900282,
+      -0.203728
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "gap_m": 57.3,
+    "reason": "private-access",
+    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
+    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
+    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898624,
+      -0.204072
+     ],
+     [
+      36.899098,
+      -0.20387
+     ]
+    ]
+   }
+  }
+ ]
+}

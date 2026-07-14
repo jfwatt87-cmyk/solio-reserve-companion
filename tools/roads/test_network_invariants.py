@@ -43,6 +43,7 @@ def main() -> None:
          str(HERE / "poster_roads.geojson"),
          "--connectors", str(HERE / "connectors.bridges.geojson"),
          "--block", str(HERE / "blockers.unconfirmed-crossings.geojson"),
+         "--block", str(HERE / "blockers.private-access.geojson"),
          "--out", str(out)],
         capture_output=True, text=True, cwd=ROOT)
     check("importer runs", proc.returncode == 0, f"exit {proc.returncode}")
@@ -106,18 +107,34 @@ def main() -> None:
                     corridor += 1
     check("no corridor duplicates", corridor == 0, f"{corridor} same-corridor pairs")
 
-    # 6. zero edges crossing any unconfirmed-crossing blocker
+    # 6. zero edges crossing a blocker. Two separate checks on purpose: one is a
+    #    data gap we expect to clear when Callan answers, the other is a standing
+    #    access decision that must NEVER clear. A failure in each means a
+    #    different thing, so they must not share a verdict.
     import json
-    blockers = json.load(open(HERE / "blockers.unconfirmed-crossings.geojson"))["features"]
-    crossings = 0
-    for f in blockers:
-        cs = [tuple(c) for c in f["geometry"]["coordinates"]]
-        for a, b, via in edges:
-            pts = edge_pts(a, b, via)
-            if any(segs_cross(pts[k], pts[k + 1], cs[m2], cs[m2 + 1])
-                   for k in range(len(pts) - 1) for m2 in range(len(cs) - 1)):
-                crossings += 1
-    check("safe mode holds", crossings == 0, f"{crossings} edges cross a blocker")
+
+    def blocker_leaks(fname: str) -> int:
+        n = 0
+        for f in json.load(open(HERE / fname))["features"]:
+            cs = [tuple(c) for c in f["geometry"]["coordinates"]]
+            for a, b, via in edges:
+                pts = edge_pts(a, b, via)
+                if any(segs_cross(pts[k], pts[k + 1], cs[m2], cs[m2 + 1])
+                       for k in range(len(pts) - 1) for m2 in range(len(cs) - 1)):
+                    n += 1
+        return n
+
+    unconf = blocker_leaks("blockers.unconfirmed-crossings.geojson")
+    check("safe mode holds", unconf == 0, f"{unconf} edges cross an unconfirmed crossing")
+
+    # Guests must never be routed over the Marriotts private CROSSINGS (D80).
+    # Deliberately narrow wording: this proves no edge traverses S18/S20, NOT that
+    # the whole private drive is unreachable — we have no geometry for the drive
+    # itself, and JW Marriott is a guest POI that must stay reachable. Do not
+    # rename this to "private access closed"; it would claim more than it checks.
+    priv = blocker_leaks("blockers.private-access.geojson")
+    check("private crossings not traversed", priv == 0,
+          f"{priv} edges cross the Marriotts private crossings")
 
     # 7. every bound POI reachable from the gate
     dist = dijkstra(adj, "gate")
