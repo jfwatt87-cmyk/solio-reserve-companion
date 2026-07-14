@@ -168,7 +168,7 @@ is *why*, and whether it survives:
   person to clear the unconfirmed list would have obediently unblocked a private
   road and started routing guests past JW. A standing access decision cannot live
   in a file whose whole semantic is "temporary".
-- **New file `tools/roads/blockers.private-access.geojson`** (11 joins, S18+S20) —
+- **New file `tools/roads/blockers.permanent.geojson`** (11 joins, S18+S20) —
   policy, permanent, `reason=private-access`. Unconfirmed list drops to **8**
   (S05×5, S22×3) and now contains only genuine data gaps. 19 blocked either way.
 - `connectors.unconfirmed.geojson`'s parked `jw-bridge` note said *"re-add when
@@ -183,7 +183,7 @@ is *why*, and whether it survives:
   `python3 tools/roads/import_gis_roads.py tools/roads/poster_roads.geojson \
      --connectors tools/roads/connectors.bridges.geojson \
      --block tools/roads/blockers.unconfirmed-crossings.geojson \
-     --block tools/roads/blockers.private-access.geojson`
+     --block tools/roads/blockers.permanent.geojson`
 
 ## S05 resolved — Kingfisher Dam, not a crossing (2026-07-14)
 Asked whether the road crosses the dam wall, Callan said: *"Yeah - you can drive to a sort of

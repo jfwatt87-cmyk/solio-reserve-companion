@@ -9,15 +9,18 @@ Each edge becomes one LineString with:
   length_m     edge length
   source       poster_trace | manual_connector (verified/drawn bridge decks)
   status       ok
-               | unconfirmed_crossing      — realises a join at a crossing still
-                 awaiting Solio's confirmation (S05, S22)
+               | unconfirmed_crossing      — a crossing still awaiting Solio's
+                 confirmation. S22 only; it may yet resolve to a normal road.
                | private_no_guest_routing  — the Marriotts private road (S18/S20):
                  real, confirmed, but closed to guests by agreement (D80)
+               | no_crossing               — S05 Kingfisher Dam: Callan confirmed
+                 it is an END POINT, not a through route (D85). Our trace invented
+                 a river crossing that does not exist.
   site         the crossing site id, when status is not ok
 
-The last two must never be collapsed into one status: "unconfirmed" is an open
-question that may resolve to a normal road, "private" is a standing decision that
-must not. Publishing a private road as `ok` is the failure this guards against.
+These must never be collapsed. Only `unconfirmed_crossing` is an open question;
+the other two are settled and must never reopen. Publishing a private road — or a
+crossing that does not exist — as `ok` is the failure this guards against.
 """
 from __future__ import annotations
 
@@ -86,15 +89,17 @@ def main() -> None:
              for m in re.finditer(r'\{ id: "([^"]+)", pixel: \{ x: ([\d.]+), y: ([\d.]+) \} \}', src)}
     connectors = (load_lines(HERE / "connectors.bridges.geojson")
                   + load_lines(HERE / "connectors.unconfirmed.geojson"))
-    # Two blocker files, two MEANINGS — and they must stay distinguishable in the
-    # export. "unconfirmed" is an open question that may yet resolve to a normal
-    # road; "private" is a standing access decision that never does. Collapsing
-    # them (or reading only the first) would publish the Marriotts private road to
-    # Callan as a plain drivable road. See Decisions Log D80.
+    # Two blocker files, three MEANINGS — keep them distinguishable in the export.
+    # `unconfirmed` is an open question that may yet resolve to a normal road;
+    # `permanent` holds the settled ones, which never do, and its `reason` says why
+    # (a private road vs a crossing that does not exist). Collapsing them, or
+    # reading only the first, would publish both to Callan as plain drivable roads.
+    # See Decisions Log D80/D85.
+    REASON_STATUS = {"private-access": "private_no_guest_routing", "no-crossing": "no_crossing"}
     blockers = [(l, p, "unconfirmed_crossing")
                 for l, p in load_lines(HERE / "blockers.unconfirmed-crossings.geojson")]
-    blockers += [(l, p, "private_no_guest_routing")
-                 for l, p in load_lines(HERE / "blockers.private-access.geojson")]
+    blockers += [(l, p, REASON_STATUS[p["reason"]])
+                 for l, p in load_lines(HERE / "blockers.permanent.geojson")]
 
     feats = []
     n_conn = n_unc = n_priv = 0
@@ -130,8 +135,10 @@ def main() -> None:
           "description": ("Solio road network v2 — traced from the printed reserve map, "
                           "georeferenced, noded and simplified. source=manual_connector marks "
                           "drawn bridge decks added by hand. status=unconfirmed_crossing marks "
-                          "edges over a crossing still awaiting confirmation (S05 Kingfisher Dam, "
-                          "S22 orphanage corner). status=private_no_guest_routing marks the "
+                          "the one crossing still awaiting confirmation (S22, the orphanage "
+                          "corner). status=no_crossing marks S05 at Kingfisher Dam, which Solio "
+                          "confirmed is an END POINT, not a through route — the dam is reachable, "
+                          "the river hop was never real. status=private_no_guest_routing marks the "
                           "Marriotts private road (S18/S20) — confirmed real, but closed to guest "
                           "routing at Solio's request (2026-07-14); the app will not route a guest "
                           "onto it. Crossings S06, S16 and S21 were confirmed by Solio on "
