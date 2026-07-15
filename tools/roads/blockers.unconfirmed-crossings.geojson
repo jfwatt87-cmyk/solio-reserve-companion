@@ -1,13 +1,174 @@
 {
  "type": "FeatureCollection",
+ "name": "Solio_Blockers_Unconfirmed",
+ "description": "Crossings NOT confirmed drivable \u2014 cut from the routing graph. OPEN: if Solio ever confirms one, unblocking is the correct response. GENERATED from crossing_decisions.json \u2014 do not hand-edit.",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
  "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S16",
+    "site_name": "Mount Kenya River Road (part)",
+    "gap_m": 21.5,
+    "status": "unconfirmed",
+    "quote": [
+     "S16 = Part of the Mount Kenya River Road"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "Identifies a ROAD. Says nothing about whether the river join we inferred is a real,",
+     "guest-drivable crossing. Unblocked on 14 Jul in breach of our own rule; reblocked",
+     "2026-07-15 (D87 F1). Costs zero POI pairs, so there was never any reason to over-read it.",
+     "To promote: ask 'does the road actually cross the river here, and may guests drive through?'"
+    ],
+    "reason": "unconfirmed"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.923047,
+      -0.197593
+     ],
+     [
+      36.923128,
+      -0.197417
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "gap_m": 25.5,
+    "status": "unconfirmed",
+    "quote": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+     "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+     "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+     "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+     "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+     "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+     "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+     "exactly why this is `unconfirmed` and not `private`."
+    ],
+    "reason": "unconfirmed",
+    "likely_endpoint": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.910093,
+      -0.155046
+     ],
+     [
+      36.90987,
+      -0.154996
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "gap_m": 14.0,
+    "status": "unconfirmed",
+    "quote": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+     "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+     "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+     "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+     "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+     "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+     "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+     "exactly why this is `unconfirmed` and not `private`."
+    ],
+    "reason": "unconfirmed",
+    "likely_endpoint": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.910115,
+      -0.15517
+     ],
+     [
+      36.910072,
+      -0.155288
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S21",
+    "site_name": "Orphanage Road",
+    "gap_m": 16.9,
+    "status": "unconfirmed",
+    "quote": [
+     "S21 = Orphanage Road - Looks good"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "Identifies a ROAD. 'Looks good' is not topology approval of the inferred river join.",
+     "Same breach and same fix as S16 (D87 F1); reblocked 2026-07-15 at zero route cost.",
+     "Also killed our 'likely Waterbuck Bridge' guess - Waterbuck is now UNLOCATED."
+    ],
+    "reason": "unconfirmed"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898304,
+      -0.243575
+     ],
+     [
+      36.898317,
+      -0.243424
+     ]
+    ]
+   }
+  },
   {
    "type": "Feature",
    "properties": {
     "site": "S22",
     "site_name": null,
     "gap_m": 17.3,
-    "still_blocked_because": "no answer from Callan (2026-07-14)"
+    "status": "unconfirmed",
+    "quote": null,
+    "decided": null,
+    "why": [
+     "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
+    ],
+    "reason": "unconfirmed"
    },
    "geometry": {
     "type": "LineString",
@@ -26,10 +187,98 @@
   {
    "type": "Feature",
    "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "gap_m": 15.3,
+    "status": "unconfirmed",
+    "quote": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+     "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+     "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+     "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+     "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+     "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+     "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+     "exactly why this is `unconfirmed` and not `private`."
+    ],
+    "reason": "unconfirmed",
+    "likely_endpoint": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.909726,
+      -0.155898
+     ],
+     [
+      36.909801,
+      -0.155783
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "gap_m": 12.5,
+    "status": "unconfirmed",
+    "quote": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+     "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+     "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+     "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+     "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+     "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+     "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+     "exactly why this is `unconfirmed` and not `private`."
+    ],
+    "reason": "unconfirmed",
+    "likely_endpoint": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.909656,
+      -0.155953
+     ],
+     [
+      36.909584,
+      -0.156039
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
     "site": "S22",
     "site_name": null,
     "gap_m": 8.0,
-    "still_blocked_because": "no answer from Callan (2026-07-14)"
+    "status": "unconfirmed",
+    "quote": null,
+    "decided": null,
+    "why": [
+     "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
+    ],
+    "reason": "unconfirmed"
    },
    "geometry": {
     "type": "LineString",
@@ -51,7 +300,13 @@
     "site": "S22",
     "site_name": null,
     "gap_m": 52.6,
-    "still_blocked_because": "no answer from Callan (2026-07-14)"
+    "status": "unconfirmed",
+    "quote": null,
+    "decided": null,
+    "why": [
+     "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
+    ],
+    "reason": "unconfirmed"
    },
    "geometry": {
     "type": "LineString",
@@ -63,6 +318,47 @@
      [
       36.888123,
       -0.25059
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "gap_m": 84.9,
+    "status": "unconfirmed",
+    "quote": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+     "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+     "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+     "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+     "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+     "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+     "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+     "exactly why this is `unconfirmed` and not `private`."
+    ],
+    "reason": "unconfirmed",
+    "likely_endpoint": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.909872,
+      -0.154966
+     ],
+     [
+      36.909871,
+      -0.155728
      ]
     ]
    }

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "deploy:prod": "bash tools/deploy-prod.sh",
     "postbuild": "node tools/gen-version.mjs",
-    "test:roads": "python3 tools/roads/test_network_invariants.py"
+    "test:roads": "python3 tools/roads/test_network_invariants.py && python3 tools/roads/test_decision_consistency.py"
   },
   "dependencies": {
     "@fontsource/fraunces": "^5.2.9",

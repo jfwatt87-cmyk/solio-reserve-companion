@@ -1,7 +1,13 @@
 {
  "type": "FeatureCollection",
  "name": "Solio_Blockers_Permanent",
- "crs": null,
+ "description": "Settled blocks \u2014 these never reopen on 'confirmation'. Only Solio reversing the access decision lifts one. GENERATED from crossing_decisions.json \u2014 do not hand-edit.",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
  "features": [
   {
    "type": "Feature",
@@ -9,10 +15,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 30.4,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -34,10 +47,20 @@
     "site": "S18",
     "site_name": "Marriotts Private Road",
     "gap_m": 30.7,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "Crossing is real; access is the decision. Callan proposed the restriction himself, so this",
+     "is agreed on both sides, not a suggestion folded into scope.",
+     "SCOPE: the two CROSSINGS are cut, not 'the drive' - we have no geometry for the Marriotts",
+     "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
+     "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -59,10 +82,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 33.7,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -84,10 +114,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 14.0,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -109,10 +146,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 33.5,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -134,10 +178,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 37.2,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -159,10 +210,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 58.6,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -184,10 +242,20 @@
     "site": "S18",
     "site_name": "Marriotts Private Road",
     "gap_m": 79.5,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "Crossing is real; access is the decision. Callan proposed the restriction himself, so this",
+     "is agreed on both sides, not a suggestion folded into scope.",
+     "SCOPE: the two CROSSINGS are cut, not 'the drive' - we have no geometry for the Marriotts",
+     "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
+     "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -209,10 +277,20 @@
     "site": "S18",
     "site_name": "Marriotts Private Road",
     "gap_m": 81.2,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "Crossing is real; access is the decision. Callan proposed the restriction himself, so this",
+     "is agreed on both sides, not a suggestion folded into scope.",
+     "SCOPE: the two CROSSINGS are cut, not 'the drive' - we have no geometry for the Marriotts",
+     "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
+     "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -234,10 +312,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 51.3,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -259,10 +344,17 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 57.3,
+    "status": "private",
+    "quote": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+     "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+    ],
     "reason": "private-access",
-    "note": "PERMANENT guest-routing restriction, not a data gap. Callan raised restricting access here (WhatsApp 2026-07-14); James agreed 2026-07-14. These crossings ARE real and confirmed \u2014 do NOT move them back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation'. Only Callan reversing the access decision lifts this.",
-    "confirmed_by": "Callan (site is real), WhatsApp 2026-07-14",
-    "agreed_by": "Callan proposed + James agreed, 2026-07-14"
+    "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
     "type": "LineString",
@@ -274,126 +366,6 @@
      [
       36.899098,
       -0.20387
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "site": "S05",
-    "site_name": "Kingfisher Dam",
-    "gap_m": 25.5,
-    "reason": "no-crossing",
-    "confirmed_by": "Callan, WhatsApp 2026-07-14",
-    "note": "PERMANENT \u2014 there is no crossing here. Asked outright 'endpoint or through route?', Callan answered 'I believe it's an end point' (2026-07-14), after 'you can drive to a sort of view point/pick nic spot'. Our poster trace invented a river crossing that does not exist on the ground. Do NOT move this back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation' \u2014 there is nothing here to confirm. Kingfisher Dam is already a POI and already routable; only the phantom river hop is cut. D85."
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.910093,
-      -0.155046
-     ],
-     [
-      36.90987,
-      -0.154996
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "site": "S05",
-    "site_name": "Kingfisher Dam",
-    "gap_m": 14.0,
-    "reason": "no-crossing",
-    "confirmed_by": "Callan, WhatsApp 2026-07-14",
-    "note": "PERMANENT \u2014 there is no crossing here. Asked outright 'endpoint or through route?', Callan answered 'I believe it's an end point' (2026-07-14), after 'you can drive to a sort of view point/pick nic spot'. Our poster trace invented a river crossing that does not exist on the ground. Do NOT move this back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation' \u2014 there is nothing here to confirm. Kingfisher Dam is already a POI and already routable; only the phantom river hop is cut. D85."
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.910115,
-      -0.15517
-     ],
-     [
-      36.910072,
-      -0.155288
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "site": "S05",
-    "site_name": "Kingfisher Dam",
-    "gap_m": 15.3,
-    "reason": "no-crossing",
-    "confirmed_by": "Callan, WhatsApp 2026-07-14",
-    "note": "PERMANENT \u2014 there is no crossing here. Asked outright 'endpoint or through route?', Callan answered 'I believe it's an end point' (2026-07-14), after 'you can drive to a sort of view point/pick nic spot'. Our poster trace invented a river crossing that does not exist on the ground. Do NOT move this back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation' \u2014 there is nothing here to confirm. Kingfisher Dam is already a POI and already routable; only the phantom river hop is cut. D85."
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.909726,
-      -0.155898
-     ],
-     [
-      36.909801,
-      -0.155783
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "site": "S05",
-    "site_name": "Kingfisher Dam",
-    "gap_m": 12.5,
-    "reason": "no-crossing",
-    "confirmed_by": "Callan, WhatsApp 2026-07-14",
-    "note": "PERMANENT \u2014 there is no crossing here. Asked outright 'endpoint or through route?', Callan answered 'I believe it's an end point' (2026-07-14), after 'you can drive to a sort of view point/pick nic spot'. Our poster trace invented a river crossing that does not exist on the ground. Do NOT move this back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation' \u2014 there is nothing here to confirm. Kingfisher Dam is already a POI and already routable; only the phantom river hop is cut. D85."
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.909656,
-      -0.155953
-     ],
-     [
-      36.909584,
-      -0.156039
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "site": "S05",
-    "site_name": "Kingfisher Dam",
-    "gap_m": 84.9,
-    "reason": "no-crossing",
-    "confirmed_by": "Callan, WhatsApp 2026-07-14",
-    "note": "PERMANENT \u2014 there is no crossing here. Asked outright 'endpoint or through route?', Callan answered 'I believe it's an end point' (2026-07-14), after 'you can drive to a sort of view point/pick nic spot'. Our poster trace invented a river crossing that does not exist on the ground. Do NOT move this back to blockers.unconfirmed-crossings.geojson and do NOT unblock on 'confirmation' \u2014 there is nothing here to confirm. Kingfisher Dam is already a POI and already routable; only the phantom river hop is cut. D85."
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.909872,
-      -0.154966
-     ],
-     [
-      36.909871,
-      -0.155728
      ]
     ]
    }

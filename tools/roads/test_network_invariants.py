@@ -107,11 +107,55 @@ def main() -> None:
                     corridor += 1
     check("no corridor duplicates", corridor == 0, f"{corridor} same-corridor pairs")
 
-    # 6. zero edges crossing a blocker. Two separate checks on purpose: one is a
-    #    data gap we expect to clear when Callan answers, the other is a standing
-    #    access decision that must NEVER clear. A failure in each means a
-    #    different thing, so they must not share a verdict.
+    # 6. Blockers. Three failures were possible here and all three were live (D87 F5/F6):
+    #
+    #  (a) VACUOUS PASS. The checks read the same file the importer used as --block, so
+    #      emptying it removed the blocking AND the expectation together — all ten checks
+    #      passed on a graph that crossed the old S18 blocker. A guard that dies with its
+    #      own spec is not a guard. Fixed by asserting the INVENTORY against the manifest.
+    #  (b) BLIND PREDICATE. `segs_cross` is strict intersection: an edge exactly OVERLAPPING
+    #      a blocker, or running COLLINEARLY through it, returned False — precisely the
+    #      node-pair and healed-seam cases the importer handles. Fixed with a distance
+    #      predicate, which catches overlap, collinear and endpoint-touch alike.
+    #  (c) UNCHECKED SHIP. The test regenerated a network and never compared it to the one
+    #      actually committed, so a stale or hand-edited roads.gis.ts passed.
     import json
+
+    from export_v2_geojson import seg_point_m  # point-to-SEGMENT; shared, so it cannot drift
+
+    BLOCK_M = 15.0
+
+    def _near(pt, pts) -> bool:
+        """Distance from a point to the POLYLINE — not to its vertices. Vertex-only
+        distance misses a long simplified edge that passes straight through with no
+        vertex there, which is exactly how a leak would hide."""
+        return min(seg_point_m(pt, pts[k], pts[k + 1]) for k in range(len(pts) - 1)) < BLOCK_M
+
+    def _crosses_properly(p1, p2, p3, p4) -> bool:
+        """Transversal intersection ONLY — no endpoint-touch, no collinear degeneracy.
+        Plain `segs_cross` returns True when an edge merely ENDS on the join, which
+        every road that legitimately stops at the river does (`jw`'s own approach)."""
+        def o(a, b, c):
+            v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+            return 0 if abs(v) < 1e-18 else (1 if v > 0 else -1)
+        o1, o2, o3, o4 = o(p1, p2, p3), o(p1, p2, p4), o(p3, p4, p1), o(p3, p4, p2)
+        if 0 in (o1, o2, o3, o4):
+            return False
+        return o1 != o2 and o3 != o4
+
+    def traverses(pts, cs) -> bool:
+        """Does this edge REALISE the blocked join — get you from one side to the other?
+
+        A join line spans the gap between two road ends A and B. An edge realises it if
+        it reaches BOTH ends (the node-pair connector and healed-seam cases — invisible
+        to strict intersection, D87 F6), or crosses the line transversally (driving over
+        the river). Merely touching one end is ADJACENCY: expected, correct, not a leak.
+        Every road that stops at the water does it.
+        """
+        if _near(cs[0], pts) and _near(cs[-1], pts):
+            return True
+        return any(_crosses_properly(pts[k], pts[k + 1], cs[i], cs[i + 1])
+                   for k in range(len(pts) - 1) for i in range(len(cs) - 1))
 
     def blocker_leaks(fname: str, reason: str | None = None) -> int:
         n = 0
@@ -120,14 +164,34 @@ def main() -> None:
                 continue
             cs = [tuple(c) for c in f["geometry"]["coordinates"]]
             for a, b, via in edges:
-                pts = edge_pts(a, b, via)
-                if any(segs_cross(pts[k], pts[k + 1], cs[m2], cs[m2 + 1])
-                       for k in range(len(pts) - 1) for m2 in range(len(cs) - 1)):
+                if traverses(edge_pts(a, b, via), cs):
                     n += 1
         return n
 
+    # (a) INVENTORY, from the manifest — this is what makes the checks non-vacuous.
+    man = json.loads((HERE / "crossing_decisions.json").read_text())["sites"]
+    joins = json.load(open(HERE.parent / "gis" / "Solio_Joins_Best_Guess.geojson"))["features"]
+    want: dict[str, int] = {}
+    for jf in joins:
+        sid = jf["properties"].get("site")
+        if sid in man and man[sid]["status"] != "confirmed":
+            want[sid] = want.get(sid, 0) + 1
+    got: dict[str, int] = {}
+    for fname in ("blockers.unconfirmed-crossings.geojson", "blockers.permanent.geojson"):
+        for f in json.load(open(HERE / fname))["features"]:
+            sid = f["properties"]["site"]
+            got[sid] = got.get(sid, 0) + 1
+    check("blocker inventory matches manifest", got == want and bool(want),
+          f"{sum(got.values())} joins across {sorted(got)}"
+          + ("" if got == want else f" — EXPECTED {want}"))
+
+    # Every site the manifest says is cut must actually be blocked, and none other.
+    cut_sites = {s for s, v in man.items() if v["status"] != "confirmed"}
+    check("cut sites match manifest", set(got) == cut_sites,
+          f"blocked={sorted(got)} manifest={sorted(cut_sites)}")
+
     unconf = blocker_leaks("blockers.unconfirmed-crossings.geojson")
-    check("safe mode holds", unconf == 0, f"{unconf} edges cross an unconfirmed crossing")
+    check("safe mode holds", unconf == 0, f"{unconf} edges traverse an unconfirmed crossing")
 
     # Guests must never be routed over the Marriotts private CROSSINGS (D80).
     # Deliberately narrow wording: this proves no edge traverses S18/S20, NOT that
@@ -136,14 +200,32 @@ def main() -> None:
     # rename this to "private access closed"; it would claim more than it checks.
     priv = blocker_leaks("blockers.permanent.geojson", "private-access")
     check("private crossings not traversed", priv == 0,
-          f"{priv} edges cross the Marriotts private crossings")
+          f"{priv} edges traverse the Marriotts private crossings")
 
-    # S05 Kingfisher Dam: Callan confirmed it's an end point, so there is no
-    # crossing to route over. Separate from the private check — same outcome,
-    # different fact, and a failure here would mean something quite different.
-    nox = blocker_leaks("blockers.permanent.geojson", "no-crossing")
-    check("no phantom crossings routed", nox == 0,
-          f"{nox} edges cross a crossing that does not exist")
+    # (c) the SHIPPED file, not just a regenerable one
+    shipped = (ROOT / "src/data/roads.gis.ts").read_text()
+    check("shipped network is the generated one", shipped == src,
+          "src/data/roads.gis.ts matches this build"
+          if shipped == src else "src/data/roads.gis.ts DIFFERS — stale or hand-edited")
+
+    # 6b. The predicate itself, on fixtures. Without these the traversal test is
+    # unfalsifiable: my first two attempts BOTH passed against live data while
+    # misclassifying fixtures — vertex-only distance missed a long edge passing
+    # through, and endpoint-touch was scored as a crossing. Live data simply never
+    # happened to hit either. Fixtures are the only reason we know it works.
+    blk = [(36.0, -0.20), (36.001, -0.20)]
+    fixtures = [
+        ("exact overlap (node-pair connector)", [(36.0, -0.20), (36.001, -0.20)], True),
+        ("collinear through", [(35.999, -0.20), (36.002, -0.20)], True),
+        ("healed seam inside a long edge", [(35.99, -0.20), (36.0005, -0.20), (36.01, -0.20)], True),
+        ("proper X crossing", [(36.0005, -0.201), (36.0005, -0.199)], True),
+        ("ends at one end (adjacency)", [(36.0, -0.20), (36.0, -0.199)], False),
+        ("harmless parallel road", [(36.0, -0.2009), (36.001, -0.2009)], False),
+    ]
+    bad = [n for n, e, want in fixtures if traverses(e, blk) != want]
+    check("traversal predicate fixtures", not bad,
+          f"{len(fixtures) - len(bad)}/{len(fixtures)} correct"
+          + (f" — MISCLASSIFIED {bad}" if bad else ""))
 
     # 7. every bound POI reachable from the gate
     dist = dijkstra(adj, "gate")

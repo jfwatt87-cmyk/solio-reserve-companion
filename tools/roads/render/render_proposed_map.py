@@ -24,19 +24,16 @@ def app2p(x, y):
     return w2p(LNG0 + x / IW * (LNG1 - LNG0), LAT0 + y / IH * (LAT1 - LAT0))
 
 v2 = json.load(open(f"{POC}/tools/gis/Solio_Roads_V2_WGS84.geojson"))["features"]
+# Site status comes from the manifest — the single source of truth (D87 F7). Road
+# edges no longer carry an access field, because we could never substantiate one
+# (D87 F3/F4): a road either survives into the network or it doesn't.
+DECIDE = json.load(open(f"{POC}/tools/roads/crossing_decisions.json"))["sites"]
 fixes = json.load(open(f"{POC}/tools/gis/Solio_Roads_Suggested_Fixes.geojson"))["features"]
 joins = json.load(open(f"{POC}/tools/gis/Solio_Joins_Best_Guess.geojson"))["features"]
 
-# Three buckets, not two. Anything that isn't `ok` must be visibly NOT a normal
-# road — bucketing the Marriotts private road with roads_ok would draw a road
-# guests must never be sent down in the same orange as one they should. (D80)
-roads_ok, roads_unc, roads_priv = [], [], []
-for f in v2:
-    L = [w2p(*c) for c in f["geometry"]["coordinates"]]
-    st = f["properties"]["status"]
-    (roads_unc if st == "unconfirmed_crossing"
-     else roads_priv if st == "private_no_guest_routing"
-     else roads_ok).append(L)
+# Every road in the export is one the app may route over — the blocked crossings
+# are absent from it entirely, and are drawn from the crossings layer as markers.
+roads_ok = [[w2p(*c) for c in f["geometry"]["coordinates"]] for f in v2]
 undrawn = [[w2p(*c) for c in f["geometry"]["coordinates"]]
            for f in fixes if f["properties"].get("fix") == "confirm_undrawn"]
 
@@ -49,11 +46,11 @@ for f in joins:
     if f["geometry"]["type"] == "Point":
         cs = [cs]
     site_pts[p["site"]].extend(w2p(*c) for c in cs)
-    site_ok[p["site"]] = site_ok.get(p["site"], False) or bool(p.get("site_confirmed"))
-    # "confirmed" and "guests may drive it" are different claims. S18/S20 are
-    # confirmed real AND closed — a green tick there would read as "all good"
-    # on the one road we must never route a guest down.
-    if p.get("guest_routable") is False and p.get("access") == "private":
+    # Status from the manifest, not from stale per-join fields. A site is ticked only
+    # if Solio confirmed you can DRIVE it — naming the road is not confirmation (D87 F1).
+    st = DECIDE.get(p["site"], {}).get("status", "confirmed")
+    site_ok[p["site"]] = st == "confirmed"
+    if st == "private":
         site_private.add(p["site"])
 sites = {s: (sum(x for x, _ in v) / len(v), sum(y for _, y in v) / len(v))
          for s, v in site_pts.items()}
@@ -128,14 +125,7 @@ for L in roads_ok:
 for L in roads_ok:
     pts = [A(p) for p in L]
     d.line(pts, fill=ORANGE, width=7, joint="curve")
-for L in roads_unc:
-    pts = [A(p) for p in L]
-    d.line(pts, fill="white", width=20, joint="curve")
-    d.line(pts, fill=YELLOW, width=12, joint="curve")
-# private road: drawn (it exists, and Callan's GIS should show it) but dashed red
-# so it can never be mistaken for a road the app will send a guest along
-for L in roads_priv:
-    dashed([A(p) for p in L], RED, 11, casing="white")
+
 
 # crossing markers
 fq = font(44)
@@ -197,9 +187,9 @@ n_green = sum(1 for s in sites if site_ok.get(s) and s not in site_private)
 n_amber = sum(1 for s in sites if not site_ok.get(s) and s not in site_private)
 n_red = len(site_private)
 LG = [("line",  ORANGE, "Roads — traced from the printed map, GPX-checked (~249 km)"),
-      ("tick",  GREEN,  f"Crossings confirmed ({n_green}) — our GPX drives + Solio, 14 Jul"),
-      ("thick", YELLOW, f"Crossings unconfirmed ({n_amber}) — the app will not route over these"),
-      ("priv",  RED,    f"Marriotts private road ({n_red} crossings) — closed to guests, Solio's call"),
+      ("tick",  GREEN,  f"Crossings confirmed ({n_green}) — recorded drives + Solio's S06, 14 Jul"),
+      ("thick", YELLOW, f"Crossings unconfirmed ({n_amber}) — not confirmed drivable; app won't route"),
+      ("priv",  RED,    f"Marriotts private crossings ({n_red}) — closed to guest through-routing"),
       ("dash",  PURPLE, "In GIS only (~34 km) — management tracks unless told otherwise"),
       ("none",  None,   "Fence excluded everywhere — it is not a road")]
 flg = font(44)
@@ -224,11 +214,9 @@ for i, (kind, col, txt) in enumerate(LG):
         d.ellipse([m - 24, cy - 24, m + 24, cy + 24], fill=col)
         d.line([(m - 11, cy + 1), (m - 3, cy + 9), (m + 12, cy - 8)], fill="white", width=7, joint="curve")
     elif kind == "priv":
-        for a_, b_ in [(x0, x0 + 22), (x0 + 34, x0 + 56)]:
-            d.line([(a_, cy), (b_, cy)], fill=col, width=9)
-        m = x1 + 4
-        d.ellipse([m - 20, cy - 20, m + 20, cy + 20], fill=col, outline="white", width=4)
-        d.line([(m - 10, cy), (m + 10, cy)], fill="white", width=6)
+        m = (x0 + x1) // 2
+        d.ellipse([m - 22, cy - 22, m + 22, cy + 22], fill=col, outline="white", width=4)
+        d.line([(m - 11, cy), (m + 11, cy)], fill="white", width=7)
     elif kind == "dash":
         for a_, b_ in [(x0, x0 + 26), (x0 + 42, x0 + 68)]:
             d.line([(a_, cy), (b_, cy)], fill=col, width=8)

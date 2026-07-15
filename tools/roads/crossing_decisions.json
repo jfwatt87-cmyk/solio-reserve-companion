@@ -1,0 +1,137 @@
+{
+  "_README": [
+    "SINGLE SOURCE OF TRUTH for every crossing-site decision. Authored by hand; nothing else is.",
+    "",
+    "build_blockers.py generates the blocker files, the joins file's decision fields and the export",
+    "description FROM THIS. test_decision_consistency.py fails if any artifact drifts from it.",
+    "It exists because on 2026-07-14 the same decision was written into five places by hand, they",
+    "disagreed within a day, and a client deliverable ended up asserting something false (D87 F7).",
+    "",
+    "status:",
+    "  confirmed   - Solio confirmed a real, guest-drivable through-crossing. Routable.",
+    "  unconfirmed - open, or identified but NOT confirmed drivable. Cut. May yet become confirmed.",
+    "  private     - real crossing, closed to guest routing by agreement. Cut. Never reopens on",
+    "                'confirmation' - only Solio reversing the access decision.",
+    "",
+    "RULE (D79, and the one I broke within the hour - D87 F1): naming a place is NOT confirming you",
+    "can drive through it. 'It's the Orphanage Road' identifies a road. It does not say the river",
+    "join we inferred there is a real crossing a guest may drive. Only promote to `confirmed` on a",
+    "recorded drive crossing, or words that speak to DRIVABILITY, not identity.",
+    "",
+    "quote: Callan's own words, verbatim. If a field cannot be traced to a quote or to recorded",
+    "evidence, it is an inference - say so in `inference`, do not launder it into `status`."
+  ],
+
+  "_provenance": {
+    "source": "Callan Day (Solio reserve manager), WhatsApp 2026-07-14",
+    "asked_by": "James",
+    "context": "Reply to the 2026-07-09 road-data pack: 7 unconfirmed crossing sites of 22.",
+    "also_said": "Happy with the Solio Roads V2 File"
+  },
+
+  "sites": {
+    "S05": {
+      "status": "unconfirmed",
+      "name": "Kingfisher Dam",
+      "guest_routable": false,
+      "quote": [
+        "S05 = Dam",
+        "Yeah - you can drive to a sort of view point/ pick nic spot",
+        "I'd say the road is pretty accurate on the map",
+        "I believe it's an end point"
+      ],
+      "date": "2026-07-14",
+      "likely_endpoint": true,
+      "ask_status": "resolved",
+      "inference": [
+        "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+        "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+        "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+        "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+        "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+        "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+        "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+        "exactly why this is `unconfirmed` and not `private`."
+      ]
+    },
+    "S06": {
+      "status": "confirmed",
+      "name": null,
+      "guest_routable": true,
+      "quote": ["S06 = Crossing"],
+      "date": "2026-07-14",
+      "inference": [
+        "'Crossing' speaks to drivability, not just identity - it is the one answer that promotes.",
+        "Name NOT confirmed: our 'Browns Bridge' guess is dropped, he never said Browns.",
+        "S06 alone reproduces all three Kingfisher detour recoveries."
+      ]
+    },
+    "S16": {
+      "status": "unconfirmed",
+      "name": "Mount Kenya River Road (part)",
+      "guest_routable": false,
+      "quote": ["S16 = Part of the Mount Kenya River Road"],
+      "date": "2026-07-14",
+      "inference": [
+        "Identifies a ROAD. Says nothing about whether the river join we inferred is a real,",
+        "guest-drivable crossing. Unblocked on 14 Jul in breach of our own rule; reblocked",
+        "2026-07-15 (D87 F1). Costs zero POI pairs, so there was never any reason to over-read it.",
+        "To promote: ask 'does the road actually cross the river here, and may guests drive through?'"
+      ]
+    },
+    "S18": {
+      "status": "private",
+      "name": "Marriotts Private Road",
+      "guest_routable": false,
+      "quote": ["S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"],
+      "date": "2026-07-14",
+      "agreed_by": "Callan proposed, James agreed, 2026-07-14",
+      "inference": [
+        "Crossing is real; access is the decision. Callan proposed the restriction himself, so this",
+        "is agreed on both sides, not a suggestion folded into scope.",
+        "SCOPE: the two CROSSINGS are cut, not 'the drive' - we have no geometry for the Marriotts",
+        "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
+        "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
+      ]
+    },
+    "S20": {
+      "status": "private",
+      "name": "Marriotts Private Road",
+      "guest_routable": false,
+      "quote": ["S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"],
+      "date": "2026-07-14",
+      "agreed_by": "Callan proposed, James agreed, 2026-07-14",
+      "inference": [
+        "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+        "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+      ]
+    },
+    "S21": {
+      "status": "unconfirmed",
+      "name": "Orphanage Road",
+      "guest_routable": false,
+      "quote": ["S21 = Orphanage Road - Looks good"],
+      "date": "2026-07-14",
+      "inference": [
+        "Identifies a ROAD. 'Looks good' is not topology approval of the inferred river join.",
+        "Same breach and same fix as S16 (D87 F1); reblocked 2026-07-15 at zero route cost.",
+        "Also killed our 'likely Waterbuck Bridge' guess - Waterbuck is now UNLOCATED."
+      ]
+    },
+    "S22": {
+      "status": "unconfirmed",
+      "name": null,
+      "guest_routable": false,
+      "quote": [],
+      "date": null,
+      "inference": [
+        "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
+      ]
+    }
+  },
+
+  "_not_listed": [
+    "S01-S04, S07-S15, S17, S19: proven by a recorded drive crossing the river within 150 m",
+    "(2026-07-09 regrade). 15 of 22 sites. Routable, never part of the Callan ask, not blocked."
+  ]
+}

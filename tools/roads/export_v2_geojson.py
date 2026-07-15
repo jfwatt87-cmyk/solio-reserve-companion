@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
-"""Export a generated roads .ts as ArcGIS-ready WGS84 GeoJSON — the v2
-best-fit road network as a comparison/replacement layer for Callan.
+"""Export a generated roads .ts as ArcGIS-ready WGS84 GeoJSON for Callan.
 
     python3 tools/roads/export_v2_geojson.py <roads.ts> <out.geojson>
 
-Each edge becomes one LineString with:
-  id           edge index
-  length_m     edge length
-  source       poster_trace | manual_connector (verified/drawn bridge decks)
-  status       ok
-               | unconfirmed_crossing      — a crossing still awaiting Solio's
-                 confirmation. S22 only; it may yet resolve to a normal road.
-               | private_no_guest_routing  — the Marriotts private road (S18/S20):
-                 real, confirmed, but closed to guests by agreement (D80)
-               | no_crossing               — S05 Kingfisher Dam: Callan confirmed
-                 it is an END POINT, not a through route (D85). Our trace invented
-                 a river crossing that does not exist.
-  site         the crossing site id, when status is not ok
+Writes TWO layers:
 
-These must never be collapsed. Only `unconfirmed_crossing` is an open question;
-the other two are settled and must never reopen. Publishing a private road — or a
-crossing that does not exist — as `ok` is the failure this guards against.
+  <out.geojson>              the road network. Per edge: id, length_m, source
+                             (poster_trace | manual_connector).
+  <out>_crossings.geojson    the crossings the app will NOT route over, one
+                             feature per blocked join: site, reason, status,
+                             Solio's verbatim quote, gap_m.
+
+WHY TWO LAYERS, and why roads carry NO access field (D87 F3/F4). The old export
+tagged ROAD EDGES by proximity to a crossing JOIN LINE. Those are different
+objects, and conflating them produced two failures at once:
+
+  - It could not describe S05/S22 at all. An exporter that iterates SURVIVING
+    edges can never label a crossing that was cut — the edge isn't there.
+  - It smeared a 15 m river-hop onto whole 550-600 m chain-merged edges, then
+    asserted "the app will not route a guest onto it" about edge 204 — which is
+    JW Marriott's ONLY access road, traversed by every route to the lodge. The
+    statement was simply false, in a file a third party reads.
+
+We have no geometry for the Marriotts road as a whole, so NO edge-level access
+claim here is substantiable. Do not add one back without that geometry. The real
+policy — guests may navigate TO JW Marriott, but the app will not route a
+through-route across S18/S20 — is a property of the crossings, so it lives in the
+crossings layer where it is true.
 """
 from __future__ import annotations
 
@@ -89,20 +95,8 @@ def main() -> None:
              for m in re.finditer(r'\{ id: "([^"]+)", pixel: \{ x: ([\d.]+), y: ([\d.]+) \} \}', src)}
     connectors = (load_lines(HERE / "connectors.bridges.geojson")
                   + load_lines(HERE / "connectors.unconfirmed.geojson"))
-    # Two blocker files, three MEANINGS — keep them distinguishable in the export.
-    # `unconfirmed` is an open question that may yet resolve to a normal road;
-    # `permanent` holds the settled ones, which never do, and its `reason` says why
-    # (a private road vs a crossing that does not exist). Collapsing them, or
-    # reading only the first, would publish both to Callan as plain drivable roads.
-    # See Decisions Log D80/D85.
-    REASON_STATUS = {"private-access": "private_no_guest_routing", "no-crossing": "no_crossing"}
-    blockers = [(l, p, "unconfirmed_crossing")
-                for l, p in load_lines(HERE / "blockers.unconfirmed-crossings.geojson")]
-    blockers += [(l, p, REASON_STATUS[p["reason"]])
-                 for l, p in load_lines(HERE / "blockers.permanent.geojson")]
-
     feats = []
-    n_conn = n_unc = n_priv = 0
+    n_conn = 0
     for i, m in enumerate(re.finditer(r'\{\s*a: "([^"]+)",\s*b: "([^"]+)",(.*?)\n  \},', src, re.S)):
         a, b, body = m.group(1), m.group(2), m.group(3)
         via = [px_world(float(x), float(y)) for x, y in re.findall(r"\{ x: ([\d.]+), y: ([\d.]+) \}", body)]
@@ -113,43 +107,69 @@ def main() -> None:
             seg_point_m(p, c[j], c[j + 1]) < 25 for c, _ in connectors for j in range(len(c) - 1)))
         source = "manual_connector" if near >= max(2, round(len(pts) * 0.3)) else "poster_trace"
 
-        # realises an unconfirmed join if any SEGMENT of it crosses or runs
-        # within 15 m of the join line (vertex-only tests miss simplified edges)
-        status, site = "ok", None
-        for bl, bprops, bstatus in blockers:
-            if any(seg_seg_m(pts[j], pts[j + 1], bl[k], bl[k + 1]) < 15
-                   for j in range(len(pts) - 1) for k in range(len(bl) - 1)):
-                status, site = bstatus, bprops.get("site")
-                break
         n_conn += source == "manual_connector"
-        n_unc += status == "unconfirmed_crossing"
-        n_priv += status == "private_no_guest_routing"
-        props = {"id": i, "length_m": round(length, 1), "source": source, "status": status}
-        if site:
-            props["site"] = site
+        # NO access/status field: see the module docstring. Every edge here is a road
+        # the app may route over — the ones it may not are simply absent, and are
+        # described in the crossings layer instead.
+        props = {"id": i, "length_m": round(length, 1), "source": source}
         feats.append({"type": "Feature", "properties": props,
                       "geometry": {"type": "LineString", "coordinates": [list(p) for p in pts]}})
 
     fc = {"type": "FeatureCollection",
           "name": "Solio_Roads_V2_WGS84",
           "description": ("Solio road network v2 — traced from the printed reserve map, "
-                          "georeferenced, noded and simplified. source=manual_connector marks "
-                          "drawn bridge decks added by hand. status=unconfirmed_crossing marks "
-                          "the one crossing still awaiting confirmation (S22, the orphanage "
-                          "corner). status=no_crossing marks S05 at Kingfisher Dam, which Solio "
-                          "confirmed is an END POINT, not a through route — the dam is reachable, "
-                          "the river hop was never real. status=private_no_guest_routing marks the "
-                          "Marriotts private road (S18/S20) — confirmed real, but closed to guest "
-                          "routing at Solio's request (2026-07-14); the app will not route a guest "
-                          "onto it. Crossings S06, S16 and S21 were confirmed by Solio on "
-                          "2026-07-14 and are now status=ok."),
+                          "georeferenced, noded and simplified. Every road here is one the app "
+                          "may route over; source=manual_connector marks drawn bridge decks added "
+                          "by hand. Roads carry NO access attribute: crossings the app will not "
+                          "route over are absent from this layer and described in the companion "
+                          "*_crossings.geojson instead. Access policy in plain terms: guests may "
+                          "navigate TO JW Marriott (a lodge they stay at), but the app will not "
+                          "route a through-route across the Marriotts private crossings (S18/S20) "
+                          "— closed at Solio's request, 2026-07-14."),
           "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
           "features": feats}
     out_path.write_text(json.dumps(fc))
+
+    # The crossings layer — the only place an access/confirmation claim is made, because
+    # it is the only place we can substantiate one. Built from the blocker files, so a
+    # cut crossing is DESCRIBED even though no road edge survives to carry a label.
+    xfeats = []
+    for fname in ("blockers.unconfirmed-crossings.geojson", "blockers.permanent.geojson"):
+        for f in json.load(open(HERE / fname))["features"]:
+            pr = f["properties"]
+            xfeats.append({"type": "Feature", "geometry": f["geometry"], "properties": {
+                "site": pr.get("site"),
+                "site_name": pr.get("site_name"),
+                "status": pr.get("status"),
+                "reason": pr.get("reason"),
+                "routed_by_app": False,
+                "gap_m": pr.get("gap_m"),
+                "solio_said": pr.get("quote"),
+                "decided": pr.get("decided"),
+            }})
+    xfc = {"type": "FeatureCollection",
+           "name": "Solio_Blocked_Crossings_V2",
+           "description": ("River crossings the app will NOT route over, and why. "
+                           "reason=unconfirmed — Solio has not confirmed the crossing is real and "
+                           "guest-drivable; naming the road is not the same as confirming you can "
+                           "drive through it, so these stay cut and may yet reopen if confirmed. "
+                           "reason=private-access — the Marriotts private crossings (S18/S20): "
+                           "real, but closed to guest through-routing at Solio's request. JW "
+                           "Marriott itself remains reachable. Crossings NOT listed here are "
+                           "routable. Generated from crossing_decisions.json."),
+           "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
+           "features": xfeats}
+    x_path = out_path.with_name(out_path.stem + "_crossings.geojson")
+    x_path.write_text(json.dumps(xfc, indent=1))
+
     total = sum(f["properties"]["length_m"] for f in feats)
+    by_reason: dict = {}
+    for f in xfeats:
+        r = f["properties"]["reason"]
+        by_reason[r] = by_reason.get(r, 0) + 1
     print(f"wrote {out_path}: {len(feats)} edges, {total/1000:.1f} km total; "
-          f"{n_conn} connector edges, {n_unc} unconfirmed-crossing edges, "
-          f"{n_priv} private-road edges (no guest routing)")
+          f"{n_conn} connector edges; NO access claims on roads (D87 F3/F4)")
+    print(f"wrote {x_path.name}: {len(xfeats)} blocked crossings {by_reason}")
 
 
 if __name__ == "__main__":

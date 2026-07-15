@@ -206,3 +206,54 @@ view point/pick nic spot"* and *"I'd say the road is pretty accurate on the map"
   degree-2 chain-merge pass in the importer before any production ship.
 - Geometry accuracy = artwork accuracy (±30–56 m at validated points).
 - `tools/roads/connectors.gpx.geojson` kept only as a record — NOT applied.
+
+
+## D87 remediation — the 15 Jul review (2026-07-15)
+gpt-5.6-sol reviewed the 14 Jul work (`f271601..fb6554f`) and returned 7 findings.
+**All accepted.** Verdict: *"I would not sign this off as-is."* Everything above this
+section that contradicts what follows is **superseded** — counts, filenames and the
+`no_crossing`/`private_no_guest_routing` statuses in particular. The authority is now
+`tools/roads/crossing_decisions.json`, and `test_decision_consistency.py` fails if any
+file drifts from it.
+
+**What was wrong, and it was the same mistake three times — a conclusion outran its
+evidence and was then written into a file as fact:**
+
+- **F1 — S16/S21 were unblocked on an over-read.** "Part of the Mount Kenya River Road"
+  and "Orphanage Road, looks good" NAME ROADS. Neither says the river join we inferred
+  is a real, guest-drivable crossing. That is the rule stated 200 lines above in this
+  very file — broken within the hour, on the next site. **Reblocked.** Measured cost:
+  **zero POI pairs**, so there was never anything to gain. S06 ("Crossing") speaks to
+  drivability and alone recovers all three Kingfisher detours.
+- **F2 — "opening S05 costs zero routes" is RETRACTED.** The experiment's extra node-pair
+  lands in a component that gets pruned, so the identical SHA proved nothing; a plausible
+  real connection moves 8/36 pairs. S05 stays cut, but as **unconfirmed + likely_endpoint**,
+  not "permanent / no-crossing" — "I believe it's an end point" is hedged, and we do not
+  launder a hedge into a fact.
+- **F3/F4 — the client export asserted a falsehood.** It tagged ROAD EDGES by proximity to
+  a crossing JOIN LINE — different objects — so it smeared a 15 m river-hop across whole
+  ~600 m merged edges and declared *"the app will not route a guest onto it"* about edge
+  204, which is **JW Marriott's only access road**. It also could not describe S05/S22 at
+  all: an exporter iterating surviving edges can never label a crossing that was cut.
+  **Fix:** roads carry NO access field (we have no Marriotts corridor geometry, so no such
+  claim is substantiable), and blocked crossings get their own layer,
+  `Solio_Roads_V2_WGS84_crossings.geojson`, where the claim is true.
+- **F5/F6 — the invariants were theatre.** Emptying the blocker files made all ten checks
+  PASS on a graph that crossed the old S18 blocker: the same file was both the blocking
+  input and the expectation. `segs_cross` also missed an edge laid exactly ALONG a blocker
+  — the node-pair connector case the importer explicitly handles. And nothing checked that
+  the SHIPPED `roads.gis.ts` was the file being tested.
+  **Fix:** inventory asserted against the manifest (emptying a blocker file now FAILS),
+  shipped-file equality asserted, and a traversal predicate that is *spans-both-ends OR
+  proper crossing* — adjacency is not a leak, since every road that stops at the river
+  touches a join. Six fixtures pin it: my first two attempts both passed live data while
+  misclassifying fixtures.
+
+**Current state (authoritative):**
+- Unconfirmed (cut, may reopen if confirmed): **S05, S16, S21, S22** — 10 joins.
+- Permanent (cut, never reopens): **S18/S20** `private-access` — 11 joins.
+- Confirmed and routable: **S06** — the only site Solio's words promoted.
+- Network `a2ffec03…`; 451 edges; 208.0 km. Emitted TS is ~88 KB, chain-merged.
+- Regenerate: `python3 tools/roads/build_blockers.py` then the importer with **both**
+  `--block` files, then `export_v2_geojson.py`. `npm run test:roads` runs invariants +
+  consistency and must pass before committing.
