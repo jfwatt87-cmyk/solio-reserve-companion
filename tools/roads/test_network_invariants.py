@@ -42,7 +42,7 @@ def main() -> None:
         [sys.executable, str(HERE / "import_gis_roads.py"),
          str(HERE / "poster_roads.geojson"),
          "--connectors", str(HERE / "connectors.bridges.geojson"),
-         "--block", str(HERE / "blockers.unconfirmed-crossings.geojson"),
+         "--block", str(HERE / "blockers.open.geojson"),
          "--block", str(HERE / "blockers.permanent.geojson"),
          "--out", str(out)],
         capture_output=True, text=True, cwd=ROOT)
@@ -83,27 +83,28 @@ def main() -> None:
     surplus = sum(n - 1 for n in keys.values() if n > 1)
     check("no exact duplicates", surplus == 0, f"{surplus} surplus copies")
 
-    # 5. zero same-endpoint corridor duplicates (geometry within 15 m end-to-end)
-    def seg_pt(p, a, b):
-        ax, ay = a; bx, by = b; px_, py_ = p
-        dx, dy = bx - ax, by - ay
-        L2 = dx * dx + dy * dy
-        t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px_ - ax) * dx + (py_ - ay) * dy) / L2))
-        return math.hypot(px_ - (ax + t * dx), py_ - (ay + t * dy))
-    M = 111_320.0 * math.cos(math.radians(-0.1975)), 110_574.0
-    def metres(pt):
-        return (pt[0] * M[0], pt[1] * M[1])
+    # 5. zero same-endpoint corridor duplicates (geometry within 15 m end-to-end).
+    # The predicate is the IMPORTER's, not a copy: this check used to reimplement it, and the
+    # copy compared each pair in arbitrary order rather than longer-against-shorter. A via-less
+    # edge is just its two endpoints, which for a same-endpoints pair sit exactly on the other
+    # edge — so it read as a duplicate of any road joining those nodes, and the g212/g293 loop
+    # tripped it the moment the S06 cut produced one (D90). Same bug, same cause, as the
+    # traversal predicate: two implementations of one rule.
+    from import_gis_roads import within_corridor, CORRIDOR_TOL_M  # noqa: E402
+
+    def edge_len_m(pts):
+        return sum(dist_m(p, q) for p, q in zip(pts, pts[1:]))
+
     by_pair: dict[frozenset, list] = {}
     for a, b, via in edges:
         if a != b:
-            by_pair.setdefault(frozenset((a, b)), []).append([metres(p) for p in edge_pts(a, b, via)])
+            by_pair.setdefault(frozenset((a, b)), []).append(edge_pts(a, b, via))
     corridor = 0
     for group in by_pair.values():
+        group = sorted(group, key=edge_len_m)      # shortest first — as the importer keeps it
         for i in range(len(group)):
             for j in range(i + 1, len(group)):
-                gi, gj = group[i], group[j]
-                if all(min(seg_pt(p, gj[k], gj[k + 1]) for k in range(len(gj) - 1)) <= 15
-                       for p in gi):
+                if within_corridor(group[j], group[i], CORRIDOR_TOL_M):
                     corridor += 1
     check("no corridor duplicates", corridor == 0, f"{corridor} same-corridor pairs")
 
@@ -145,13 +146,14 @@ def main() -> None:
     # (a) INVENTORY, from the manifest — this is what makes the checks non-vacuous.
     man = json.loads((HERE / "crossing_decisions.json").read_text())["sites"]
     joins = json.load(open(HERE.parent / "gis" / "Solio_Joins_Best_Guess.geojson"))["features"]
+    from build_blockers import blocked  # noqa: E402  — one definition of "is this cut"
     want: dict[str, int] = {}
     for jf in joins:
         sid = jf["properties"].get("site")
-        if sid in man and man[sid]["status"] != "confirmed":
+        if sid in man and blocked(man[sid]):
             want[sid] = want.get(sid, 0) + 1
     got: dict[str, int] = {}
-    for fname in ("blockers.unconfirmed-crossings.geojson", "blockers.permanent.geojson"):
+    for fname in ("blockers.open.geojson", "blockers.permanent.geojson"):
         for f in json.load(open(HERE / fname))["features"]:
             sid = f["properties"]["site"]
             got[sid] = got.get(sid, 0) + 1
@@ -160,12 +162,41 @@ def main() -> None:
           + ("" if got == want else f" — EXPECTED {want}"))
 
     # Every site the manifest says is cut must actually be blocked, and none other.
-    cut_sites = {s for s, v in man.items() if v["status"] != "confirmed"}
+    cut_sites = {s for s, v in man.items() if blocked(v)}
     check("cut sites match manifest", set(got) == cut_sites,
           f"blocked={sorted(got)} manifest={sorted(cut_sites)}")
 
-    unconf = blocker_leaks("blockers.unconfirmed-crossings.geojson")
-    check("safe mode holds", unconf == 0, f"{unconf} edges traverse an unconfirmed crossing")
+    unconf = blocker_leaks("blockers.open.geojson")
+    check("safe mode holds", unconf == 0, f"{unconf} edges traverse an unanswered crossing")
+
+    # (b2) WHICH connectors are in the graph — by name, against an allow-list. Blockers are a
+    # policy on PLACES and reach only as far as their geometry: none of the eight S20 blockers
+    # comes within 44 m of `jw-bridge`, the parked Marriotts private crossing, so re-adding it
+    # to connectors.bridges.geojson imported clean, cut gate->jw from 6.64 to 6.43 km through
+    # the private drive, and left this entire suite green (D90 F1). The importer now refuses a
+    # line marked `access=private`; this catches the one that arrives unmarked.
+    ALLOWED_CONNECTORS = {"tharua-bridge", "browns-bridge"}
+    active = set(re.search(r"active connectors: (.*)", proc.stdout).group(1).split())
+    check("only allow-listed connectors are in the graph", active == ALLOWED_CONNECTORS,
+          f"active={sorted(active)}" + ("" if active == ALLOWED_CONNECTORS
+                                        else f" — EXPECTED {sorted(ALLOWED_CONNECTORS)}"))
+
+    # (b3) ...and the refusal itself works. Import the real parked jw-bridge and require the
+    # importer to reject it. Without this, the guard above is a claim, not a fact.
+    with tempfile.TemporaryDirectory() as td:
+        evil = Path(td) / "evil.geojson"
+        bridges = json.load(open(HERE / "connectors.bridges.geojson"))
+        parked = json.load(open(HERE / "connectors.unconfirmed.geojson"))
+        bridges["features"].extend(parked["features"])
+        evil.write_text(json.dumps(bridges))
+        p2 = subprocess.run(
+            [sys.executable, str(HERE / "import_gis_roads.py"), str(HERE / "poster_roads.geojson"),
+             "--connectors", str(evil), "--out", str(Path(td) / "o.ts")],
+            capture_output=True, text=True, cwd=ROOT)
+        refused = p2.returncode != 0 and "jw-bridge" in (p2.stdout + p2.stderr)
+        check("importer refuses the parked private crossing", refused,
+              "re-adding jw-bridge to the connectors is rejected"
+              if refused else f"IMPORTED A PRIVATE CROSSING — exit {p2.returncode}")
 
     # Guests must never be routed over the Marriotts private CROSSINGS (D80).
     # Deliberately narrow wording: this proves no edge traverses S18/S20, NOT that
@@ -183,23 +214,58 @@ def main() -> None:
           if shipped == src else "src/data/roads.gis.ts DIFFERS — stale or hand-edited")
 
     # 6b. The predicate itself, on fixtures. Without these the traversal test is
-    # unfalsifiable: my first two attempts BOTH passed against live data while
-    # misclassifying fixtures — vertex-only distance missed a long edge passing
-    # through, and endpoint-touch was scored as a crossing. Live data simply never
-    # happened to hit either. Fixtures are the only reason we know it works.
-    blk = [(36.0, -0.20), (36.001, -0.20)]
+    # unfalsifiable: FOUR attempts at this predicate passed against live data while
+    # misclassifying fixtures — vertex-only distance missed a long edge passing through,
+    # endpoint-touch was scored as a crossing, `pts[len//2]` read a 2-point join's END as
+    # its middle, and "a point of the road is near each end" read a road STOPPING at a
+    # 30 m join as spanning it. Live data never happened to hit any of them. The network
+    # sha is identical across all four, which is exactly why the sha proves nothing here.
+    #
+    # Fixtures are built in a local METRE frame, because every rule below is about metres
+    # and degrees-of-longitude hide the arithmetic. Blocker: a 100 m join, W to E.
+    from import_gis_roads import M_PER_DEG_LNG, M_PER_DEG_LAT  # noqa: E402
+    LNG0, LAT0 = 36.90, -0.20
+
+    def P(x, y):
+        return (LNG0 + x / M_PER_DEG_LNG, LAT0 + y / M_PER_DEG_LAT)
+
+    def L(*xy):
+        return [P(x, y) for x, y in xy]
+
+    blk = L((-50, 0), (50, 0))
     fixtures = [
-        ("exact overlap (node-pair connector)", [(36.0, -0.20), (36.001, -0.20)], True),
-        ("collinear through", [(35.999, -0.20), (36.002, -0.20)], True),
-        ("healed seam inside a long edge", [(35.99, -0.20), (36.0005, -0.20), (36.01, -0.20)], True),
-        ("proper X crossing", [(36.0005, -0.201), (36.0005, -0.199)], True),
-        ("ends at one end (adjacency)", [(36.0, -0.20), (36.0, -0.199)], False),
-        ("harmless parallel road", [(36.0, -0.2009), (36.001, -0.2009)], False),
+        # --- must cut: the road really does realise the join ---
+        ("connector end-to-end on the join", L((-50, 0), (50, 0)), True),
+        ("collinear through", L((-150, 0), (150, 0)), True),
+        ("healed seam inside a long edge", L((-200, 0), (-50, 0), (50, 0), (200, 0)), True),
+        ("proper X crossing", L((0, -40), (0, 40)), True),
+        ("reaches both ends via INTERNAL vertices", L((-50, -100), (-50, 0), (0, 12.5), (50, 0), (50, -100)), True),
+        # --- must not cut: adjacency, detours, near misses ---
+        ("ends at one end (adjacency)", L((-200, -3), (-50, 0)), False),
+        ("harmless parallel road", L((-50, 90), (50, 90)), False),
+        ("touches an end (orientation A)", L((-50, 60), (-50, 0)), False),
+        ("touches an end (orientation B) — same line reversed", L((-50, 0), (-50, 60)), False),
+        ("ends at the join's MIDPOINT", L((0, 60), (0, 0)), False),
+        ("long way round: U-shape reaching both ends", L((-50, 0), (-50, -500), (50, -500), (50, 0)), False),
+        # --- tolerance boundaries: the rules must bite where they say they do ---
+        ("reach at 40.0 m — inside pair_tol", L((-50, 40.0), (50, 40.0)), True),
+        ("reach at 40.1 m — outside pair_tol", L((-50, 40.1), (50, 40.1)), False),
     ]
     bad = [n for n, e, want in fixtures if traverses(e, blk) != want]
     check("traversal predicate fixtures", not bad,
           f"{len(fixtures) - len(bad)}/{len(fixtures)} correct"
           + (f" — MISCLASSIFIED {bad}" if bad else ""))
+
+    # 6c. A road ending at a join SHORTER than pair_tol. Live S18 is 30.7 m and the
+    # tolerance is 40 m, so "near both ends" is satisfiable by a single point: the 557 m
+    # road g354->g192 that merely stops there scored as spanning it, with an along-road
+    # span of 0.0 m. The live private-crossing check caught this one — fixture it so the
+    # next rewrite cannot reintroduce it quietly.
+    short_join = L((0, 0), (0, 30.7))
+    long_road = L((0, 0), (300, -40), (557, -40))
+    check("road ending at a join shorter than the tolerance is not a span",
+          not traverses(long_road, short_join),
+          "557 m road stopping at a 30.7 m join does not realise it")
 
     # 7. every bound POI reachable from the gate
     dist = dijkstra(adj, "gate")

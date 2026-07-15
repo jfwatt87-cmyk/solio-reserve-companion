@@ -1,7 +1,7 @@
 {
  "type": "FeatureCollection",
  "name": "Solio_Blocked_Crossings_V2",
- "description": "River crossings the app will NOT route over, and why. reason=unconfirmed \u2014 Solio has not confirmed the crossing is real and guest-drivable; naming the road is not the same as confirming you can drive through it, so these stay cut and may yet reopen if confirmed. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, but closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. A crossing NOT listed here is not blocked by this decision layer \u2014 which is NOT the same as asserting its geometry is present and routable in the network. Generated from crossing_decisions.json.",
+ "description": "River crossings the app will NOT route over, and why. Each carries two SEPARATE facts: crossing_exists (is there a crossing here?) and guest_routable (may a guest drive through it?). Either can be \"unknown\", and unknown is why most of these are cut. reason=crossing-unconfirmed \u2014 we have not established there is a real, drivable crossing here; naming the road is not the same as confirming you can drive through it. reason=permission-unknown \u2014 the crossing IS real, but nobody has asked whether guests may use it, so the app does not assume they may. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, and closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. The first two reopen the moment Solio answers; the third does not. A crossing NOT listed here is not blocked by this decision layer \u2014 which is NOT the same as asserting its geometry is present and routable in the network. Generated from crossing_decisions.json.",
  "crs": {
   "type": "name",
   "properties": {
@@ -9,6 +9,35 @@
   }
  },
  "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.937133,
+      -0.158494
+     ],
+     [
+      36.936745,
+      -0.15846
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S06",
+    "site_name": null,
+    "crossing_exists": true,
+    "guest_routable": "unknown",
+    "reason": "permission-unknown",
+    "routed_by_app": false,
+    "gap_m": 43.3,
+    "solio_said": [
+     "S06 = Crossing"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
   {
    "type": "Feature",
    "geometry": {
@@ -27,8 +56,9 @@
    "properties": {
     "site": "S16",
     "site_name": "Mount Kenya River Road (part)",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 21.5,
     "solio_said": [
@@ -55,8 +85,9 @@
    "properties": {
     "site": "S05",
     "site_name": "Kingfisher Dam",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 25.5,
     "solio_said": [
@@ -86,8 +117,9 @@
    "properties": {
     "site": "S05",
     "site_name": "Kingfisher Dam",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 14.0,
     "solio_said": [
@@ -117,8 +149,9 @@
    "properties": {
     "site": "S21",
     "site_name": "Orphanage Road",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 16.9,
     "solio_said": [
@@ -145,8 +178,9 @@
    "properties": {
     "site": "S22",
     "site_name": null,
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 17.3,
     "solio_said": null,
@@ -171,8 +205,9 @@
    "properties": {
     "site": "S05",
     "site_name": "Kingfisher Dam",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 15.3,
     "solio_said": [
@@ -202,8 +237,9 @@
    "properties": {
     "site": "S05",
     "site_name": "Kingfisher Dam",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 12.5,
     "solio_said": [
@@ -233,8 +269,9 @@
    "properties": {
     "site": "S22",
     "site_name": null,
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 8.0,
     "solio_said": null,
@@ -259,8 +296,9 @@
    "properties": {
     "site": "S22",
     "site_name": null,
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 52.6,
     "solio_said": null,
@@ -285,8 +323,9 @@
    "properties": {
     "site": "S05",
     "site_name": "Kingfisher Dam",
-    "status": "unconfirmed",
-    "reason": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "routed_by_app": false,
     "gap_m": 84.9,
     "solio_said": [
@@ -316,7 +355,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 30.4,
@@ -344,7 +384,8 @@
    "properties": {
     "site": "S18",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 30.7,
@@ -372,7 +413,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 33.7,
@@ -400,7 +442,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 14.0,
@@ -428,7 +471,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 33.5,
@@ -456,7 +500,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 37.2,
@@ -484,7 +529,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 58.6,
@@ -512,7 +558,8 @@
    "properties": {
     "site": "S18",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 79.5,
@@ -540,7 +587,8 @@
    "properties": {
     "site": "S18",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 81.2,
@@ -568,7 +616,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 51.3,
@@ -596,7 +645,8 @@
    "properties": {
     "site": "S20",
     "site_name": "Marriotts Private Road",
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
     "reason": "private-access",
     "routed_by_app": false,
     "gap_m": 57.3,

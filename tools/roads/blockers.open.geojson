@@ -1,7 +1,7 @@
 {
  "type": "FeatureCollection",
- "name": "Solio_Blockers_Unconfirmed",
- "description": "Crossings NOT confirmed drivable \u2014 cut from the routing graph. OPEN: if Solio ever confirms one, unblocking is the correct response. GENERATED from crossing_decisions.json \u2014 do not hand-edit.",
+ "name": "Solio_Blockers_Open",
+ "description": "Crossings cut pending an ANSWER \u2014 either we have not established the crossing exists (reason=crossing-unconfirmed) or it does exist and nobody has asked whether guests may drive it (reason=permission-unknown). OPEN: if Solio answers, unblocking is the correct response. GENERATED from crossing_decisions.json \u2014 do not hand-edit.",
  "crs": {
   "type": "name",
   "properties": {
@@ -12,10 +12,65 @@
   {
    "type": "Feature",
    "properties": {
+    "site": "S06",
+    "site_name": null,
+    "gap_m": 43.3,
+    "crossing_exists": true,
+    "guest_routable": "unknown",
+    "reason": "permission-unknown",
+    "quote": [
+     "S06 = Crossing"
+    ],
+    "decided": "2026-07-14",
+    "why": [
+     "CROSSING EXISTS: quoted. 'Crossing' answers the topology question directly - unlike S16/S21,",
+     "which name the ROAD the join sits on and say nothing about the join itself.",
+     "GUEST ROUTABLE: UNKNOWN. Nobody has asked. CUT until someone does.",
+     "",
+     "The reasoning that kept it open for three review rounds: Callan flagged access restrictions",
+     "explicitly where he wanted them (S18/S20, unprompted), said nothing of the sort here, and",
+     "S06 is drawn on the guest poster - so the default should be that guests may use it. That is",
+     "a decent bet. It is not an answer, and D79 exists precisely to stop me routing on a decent",
+     "bet: 'Crossing' answers topology, not permission. Round 1 called it an over-read; round 2",
+     "called it an over-read; I answered round 2 by writing `routable_basis: inference` next to",
+     "`guest_routable: true` and calling it fixed. Labelling the guess did not stop the app acting",
+     "on the guess - the site stayed in the graph and the joins file still read 'guests may drive",
+     "it'. An inference is a reason to ask a better question, not a basis for routing (D90 F2).",
+     "",
+     "COST OF BLOCKING: 15/36 POI pairs, including all three Kingfisher recoveries",
+     "(rhinogate->kingfisher 9.36->10.95 km, kingfisher->yellowthorn 6.18->7.33,",
+     "kingfisher->naribo 7.58->9.18). Nothing becomes unreachable - every POI still routes, just",
+     "further; worst case +1.60 km. S06 is the ONLY site whose answer buys anything: S16 and S21",
+     "are worth exactly zero. That cost is why this is worth an ask, and is not a reason to assume",
+     "the answer. Nav is off, so today it costs nothing real.",
+     "",
+     "TO SETTLE: 'May guests drive through the crossing at S06?' One answer, one field.",
+     "Name NOT confirmed: our 'Browns Bridge' guess is dropped, he never said Browns."
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.937133,
+      -0.158494
+     ],
+     [
+      36.936745,
+      -0.15846
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
     "site": "S16",
     "site_name": "Mount Kenya River Road (part)",
     "gap_m": 21.5,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S16 = Part of the Mount Kenya River Road"
     ],
@@ -25,8 +80,7 @@
      "guest-drivable crossing. Unblocked on 14 Jul in breach of our own rule; reblocked",
      "2026-07-15 (D87 F1). Costs zero POI pairs, so there was never any reason to over-read it.",
      "To promote: ask 'does the road actually cross the river here, and may guests drive through?'"
-    ],
-    "reason": "unconfirmed"
+    ]
    },
    "geometry": {
     "type": "LineString",
@@ -48,7 +102,9 @@
     "site": "S05",
     "site_name": "Kingfisher Dam",
     "gap_m": 25.5,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -66,7 +122,6 @@
      "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
      "exactly why this is `unconfirmed` and not `private`."
     ],
-    "reason": "unconfirmed",
     "likely_endpoint": true
    },
    "geometry": {
@@ -89,7 +144,9 @@
     "site": "S05",
     "site_name": "Kingfisher Dam",
     "gap_m": 14.0,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -107,7 +164,6 @@
      "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
      "exactly why this is `unconfirmed` and not `private`."
     ],
-    "reason": "unconfirmed",
     "likely_endpoint": true
    },
    "geometry": {
@@ -130,7 +186,9 @@
     "site": "S21",
     "site_name": "Orphanage Road",
     "gap_m": 16.9,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S21 = Orphanage Road - Looks good"
     ],
@@ -139,8 +197,7 @@
      "Identifies a ROAD. 'Looks good' is not topology approval of the inferred river join.",
      "Same breach and same fix as S16 (D87 F1); reblocked 2026-07-15 at zero route cost.",
      "Also killed our 'likely Waterbuck Bridge' guess - Waterbuck is now UNLOCATED."
-    ],
-    "reason": "unconfirmed"
+    ]
    },
    "geometry": {
     "type": "LineString",
@@ -162,13 +219,14 @@
     "site": "S22",
     "site_name": null,
     "gap_m": 17.3,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": null,
     "decided": null,
     "why": [
      "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
-    ],
-    "reason": "unconfirmed"
+    ]
    },
    "geometry": {
     "type": "LineString",
@@ -190,7 +248,9 @@
     "site": "S05",
     "site_name": "Kingfisher Dam",
     "gap_m": 15.3,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -208,7 +268,6 @@
      "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
      "exactly why this is `unconfirmed` and not `private`."
     ],
-    "reason": "unconfirmed",
     "likely_endpoint": true
    },
    "geometry": {
@@ -231,7 +290,9 @@
     "site": "S05",
     "site_name": "Kingfisher Dam",
     "gap_m": 12.5,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -249,7 +310,6 @@
      "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
      "exactly why this is `unconfirmed` and not `private`."
     ],
-    "reason": "unconfirmed",
     "likely_endpoint": true
    },
    "geometry": {
@@ -272,13 +332,14 @@
     "site": "S22",
     "site_name": null,
     "gap_m": 8.0,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": null,
     "decided": null,
     "why": [
      "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
-    ],
-    "reason": "unconfirmed"
+    ]
    },
    "geometry": {
     "type": "LineString",
@@ -300,13 +361,14 @@
     "site": "S22",
     "site_name": null,
     "gap_m": 52.6,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": null,
     "decided": null,
     "why": [
      "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
-    ],
-    "reason": "unconfirmed"
+    ]
    },
    "geometry": {
     "type": "LineString",
@@ -328,7 +390,9 @@
     "site": "S05",
     "site_name": "Kingfisher Dam",
     "gap_m": 84.9,
-    "status": "unconfirmed",
+    "crossing_exists": "unknown",
+    "guest_routable": "unknown",
+    "reason": "crossing-unconfirmed",
     "quote": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -346,7 +410,6 @@
      "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
      "exactly why this is `unconfirmed` and not `private`."
     ],
-    "reason": "unconfirmed",
     "likely_endpoint": true
    },
    "geometry": {
