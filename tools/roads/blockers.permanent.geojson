@@ -15,7 +15,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 30.4,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -24,7 +26,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -47,7 +48,9 @@
     "site": "S18",
     "site_name": "Marriotts Private Road",
     "gap_m": 30.7,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -59,7 +62,6 @@
      "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
      "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -82,7 +84,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 33.7,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -91,7 +95,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -114,7 +117,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 14.0,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -123,7 +128,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -146,7 +150,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 33.5,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -155,7 +161,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -178,7 +183,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 37.2,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -187,7 +194,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -210,7 +216,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 58.6,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -219,7 +227,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -242,7 +249,9 @@
     "site": "S18",
     "site_name": "Marriotts Private Road",
     "gap_m": 79.5,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -254,7 +263,6 @@
      "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
      "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -277,7 +285,9 @@
     "site": "S18",
     "site_name": "Marriotts Private Road",
     "gap_m": 81.2,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -289,7 +299,6 @@
      "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
      "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -312,7 +321,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 51.3,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -321,7 +332,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {
@@ -344,7 +354,9 @@
     "site": "S20",
     "site_name": "Marriotts Private Road",
     "gap_m": 57.3,
-    "status": "private",
+    "crossing_exists": true,
+    "guest_routable": false,
+    "reason": "private-access",
     "quote": [
      "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
     ],
@@ -353,7 +365,6 @@
      "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
      "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
     ],
-    "reason": "private-access",
     "agreed_by": "Callan proposed, James agreed, 2026-07-14"
    },
    "geometry": {

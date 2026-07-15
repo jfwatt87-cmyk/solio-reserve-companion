@@ -136,14 +136,48 @@ def bind_pois_to_edges(
     return claimed
 
 
+def closed_to_guests(props: dict) -> str | None:
+    """Reason this line is marked closed to guests, or None. IDENTITY, not geometry.
+
+    D90 F1. `connectors.unconfirmed.geojson` parks `jw-bridge` — the Marriotts private
+    crossing — carrying `access=private`, `guest_routable=false` and a note reading "DO NOT
+    RE-ADD for guest routing". The ONLY thing keeping it out of the graph was that nobody
+    passes that file to --connectors. Copy it into connectors.bridges.geojson (which the
+    note's own predecessor invited: "re-add when Callan confirms S20" — and he has now
+    confirmed it) and it imports clean: the S20 blockers do NOT catch it (nearest endpoint
+    44.5 m > BLOCK_PAIR_TOL_M=40; nearest midpoint 53.3 m > BLOCK_TOL_M=12), the whole suite
+    stays green, gate->jw drops 6.64 -> 6.43 km through the private drive, and the exporter
+    strips `access` and ships it to the client as ordinary road.
+
+    Proximity blockers are a policy on PLACES. This is a policy on THIS LINE. A line whose
+    own properties say guests may not use it must never become routable road, whatever file
+    it is in and whatever the blocker geometry does or does not reach.
+    """
+    access = str(props.get("access", "") or "").strip().lower()
+    if access in ("private", "no", "closed", "restricted"):
+        return f"access={access!r}"
+    gr = props.get("guest_routable")
+    if gr is False or (isinstance(gr, str) and gr.strip().lower() in ("false", "no")):
+        return f"guest_routable={gr!r}"
+    return None
+
+
 def load_lines(path: Path) -> list[dict]:
     data = json.loads(path.read_text())
     if data.get("type") != "FeatureCollection":
         sys.exit("error: expected a GeoJSON FeatureCollection")
     lines = []
+    refused = []
     for i, f in enumerate(data.get("features", [])):
         geom = f.get("geometry") or {}
         props = f.get("properties") or {}
+        # Refuse LOUDLY rather than skip quietly: a private line reaching this importer means
+        # someone believed it belonged in the network, and that belief needs correcting, not
+        # silently honouring. There is no flag to override this — reopening a private crossing
+        # is Solio's decision to make in crossing_decisions.json, not the importer's.
+        if (why := closed_to_guests(props)) is not None:
+            refused.append(f"    {path.name} feature {i} ({props.get('fix') or props.get('name') or '?'}): {why}")
+            continue
         coords_sets: list[list[list[float]]]
         if geom.get("type") == "LineString":
             coords_sets = [geom["coordinates"]]
@@ -159,7 +193,14 @@ def load_lines(path: Path) -> list[dict]:
             pts = [(float(c[0]), float(c[1])) for c in coords]
             if len(pts) < 2:
                 continue
-            lines.append({"pts": pts, "name": str(props.get("name", "") or ""), "surface": surface})
+            lines.append({"pts": pts, "name": str(props.get("name", "") or ""),
+                          "surface": surface, "fix": str(props.get("fix", "") or "") or None})
+    if refused:
+        sys.exit("error: refusing to import line(s) whose own properties say guests may not "
+                 "drive them:\n" + "\n".join(refused) +
+                 "\n  These are closed by DECISION, not by geometry. If Solio has reopened one, "
+                 "change its status in tools/roads/crossing_decisions.json and remove the "
+                 "access/guest_routable marking deliberately — do not route around this check.")
     if not lines:
         sys.exit("error: no LineString features found")
     return lines
@@ -298,11 +339,22 @@ def load_blocker_lines(paths: list[Path]) -> list[list[tuple[float, float]]]:
 
 
 def _segs_properly_intersect(p1, p2, p3, p4) -> bool:
-    def ccw(a, b, c):
-        return (c[1] - a[1]) * (b[0] - a[0]) - (b[1] - a[1]) * (c[0] - a[0])
-    d1, d2 = ccw(p3, p4, p1), ccw(p3, p4, p2)
-    d3, d4 = ccw(p1, p2, p3), ccw(p1, p2, p4)
-    return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
+    """Strict transversal: each segment straddles the other's line.
+
+    ORIENTATION-INVARIANT (D90 F3). The old form tested `(d1 > 0) != (d2 > 0)`, which reads a
+    zero — a point exactly ON the other line — as "negative side". So a segment TOUCHING the
+    blocker's end scored as a crossing written one way round and not the other: reversing the
+    line's own vertex order changed the answer. A touch is not a crossing in either order, so
+    every determinant must be strictly non-zero for this to be a straddle.
+    """
+    def side(a, b, c) -> int:
+        v = (c[1] - a[1]) * (b[0] - a[0]) - (b[1] - a[1]) * (c[0] - a[0])
+        return 0 if abs(v) < 1e-18 else (1 if v > 0 else -1)
+    d1, d2 = side(p3, p4, p1), side(p3, p4, p2)
+    d3, d4 = side(p1, p2, p3), side(p1, p2, p4)
+    if 0 in (d1, d2, d3, d4):
+        return False        # touching / collinear — handled by the span forms, not here
+    return d1 != d2 and d3 != d4
 
 
 # The ONE definition of "this edge realises a blocked join". Both the importer (which
@@ -340,23 +392,98 @@ def poly_midpoint(line):
     return line[-1]
 
 
-def realises_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOCK_PAIR_TOL_M) -> bool:
-    def dist_to_poly(q, poly):
-        return min(project_to_segment(q, a, b)[2] for a, b in zip(poly, poly[1:]))
+def poly_len(line) -> float:
+    return sum(dist_m(a, b) for a, b in zip(line, line[1:]))
 
-    # (a) the edge spans the join end-to-end
-    a0, a1, b0, b1 = pts[0], pts[-1], line[0], line[-1]
-    if ((dist_m(a0, b0) <= pair_tol and dist_m(a1, b1) <= pair_tol)
-            or (dist_m(a0, b1) <= pair_tol and dist_m(a1, b0) <= pair_tol)):
-        return True
-    # (b) the blocker lies along this edge — midpoint on the road, not merely an end
-    #     near it. This is what makes mere ADJACENCY (a road stopping at the river)
-    #     not a leak, without needing a special case for it.
-    if dist_to_poly(poly_midpoint(line), pts) <= tol:
-        return True
-    # (c) transversal crossing
-    return any(_segs_properly_intersect(pts[i], pts[i + 1], line[j], line[j + 1])
-               for i in range(len(pts) - 1) for j in range(len(line) - 1))
+
+def nearest_on_poly(q, poly) -> tuple[float, float]:
+    """(perpendicular distance to poly, distance ALONG poly to that closest point), metres."""
+    best_d, best_s, run = None, 0.0, 0.0
+    for a, b in zip(poly, poly[1:]):
+        t, _proj, d = project_to_segment(q, a, b)
+        seg = dist_m(a, b)
+        if best_d is None or d < best_d:
+            best_d, best_s = d, run + t * seg
+        run += seg
+    return (best_d if best_d is not None else math.inf), best_s
+
+
+# How far the road may wander between the join's two ends and still BE that join. A crossing
+# is a short hop over a river; a road that reaches both banks 1.1 km apart the long way round
+# is a legitimate detour, not the crossing (D90 F3).
+DETOUR_FACTOR = 2.5
+DETOUR_SLACK_M = 40.0
+# ...and it must actually GO from one bank to the other. Requiring only "a point of the road is
+# near each end" is satisfied by a SINGLE point whenever the join is shorter than pair_tol —
+# which is most of them (S18 is 30.7 m vs a 40 m tolerance). That read the 557 m road ENDING at
+# S18 as spanning it: both ends of the join were within 40 m of the road's last vertex, giving
+# an along-road span of 0.0 m. Adjacency misread as traversal — the same mistake as the D89
+# midpoint bug, in the fix for the D90 one. The road must cover the join, not just touch it.
+SPAN_MIN_FRAC = 0.5
+# A seam means the join lies ALONG the road for its whole length — so nearly every sample of
+# the join must sit on the road. Testing only the join's MIDPOINT let a road that merely ends
+# at the join's middle count as a seam and get cut.
+SEAM_COVER_FRAC = 0.9
+SEAM_SAMPLES = 24
+
+
+def _sample(line, n: int):
+    """n points spread evenly ALONG the polyline by length."""
+    total = poly_len(line)
+    if total == 0:
+        return [line[0]]
+    out, run, seg_i = [], 0.0, 0
+    segs = list(zip(line, line[1:]))
+    for k in range(n + 1):
+        want = total * k / n
+        while seg_i < len(segs) - 1 and run + dist_m(*segs[seg_i]) < want:
+            run += dist_m(*segs[seg_i])
+            seg_i += 1
+        a, b = segs[seg_i]
+        d = dist_m(a, b)
+        t = (want - run) / d if d else 0.0
+        t = max(0.0, min(1.0, t))
+        out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+    return out
+
+
+def classify_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOCK_PAIR_TOL_M):
+    """How this edge realises this blocked join, or None. THE single classifier.
+
+    Both `cut_blocked_edges` (which cuts) and test_network_invariants.py (which proves none
+    survived) call this. They must not merely agree in spirit: the cutter used to reimplement
+    the rules with its own hard-coded 12 and 40, so changing the cutter's tolerance to 11 left
+    the whole suite green — the safety oracle could not see the cutter's actual behaviour
+    (D90 F3). There is one implementation and one set of constants.
+
+    Returns (kind, lo_m, hi_m) where kind is:
+      "span"     the road runs the join — reaches both ends, directly. Cut that SPAN out.
+      "crossing" the road strictly straddles the join. Cut the edge whole.
+    A road merely touching, or ending at, the join is NEITHER: that is a road stopping at the
+    river bank, which is exactly what an unbuilt crossing looks like.
+    """
+    blen = poly_len(line)
+    # (a) reaches BOTH ends of the join — and gets between them directly enough to BE it
+    d0, s0 = nearest_on_poly(line[0], pts)
+    d1, s1 = nearest_on_poly(line[-1], pts)
+    if d0 <= pair_tol and d1 <= pair_tol:
+        span = abs(s1 - s0)
+        if blen * SPAN_MIN_FRAC <= span <= max(blen * DETOUR_FACTOR, blen + DETOUR_SLACK_M):
+            return ("span", min(s0, s1), max(s0, s1))
+    # (b) seam — the join lies along the road for (nearly) its whole length
+    samples = _sample(line, SEAM_SAMPLES)
+    near = sum(1 for q in samples if nearest_on_poly(q, pts)[0] <= tol)
+    if near / len(samples) >= SEAM_COVER_FRAC:
+        return ("span", min(s0, s1), max(s0, s1))
+    # (c) strict transversal
+    if any(_segs_properly_intersect(pts[i], pts[i + 1], line[j], line[j + 1])
+           for i in range(len(pts) - 1) for j in range(len(line) - 1)):
+        return ("crossing", None, None)
+    return None
+
+
+def realises_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOCK_PAIR_TOL_M) -> bool:
+    return classify_blocker(pts, line, tol, pair_tol) is not None
 
 
 def cut_blocked_edges(
@@ -370,32 +497,13 @@ def cut_blocked_edges(
         edge polyline; the overlapping SPAN is cut out (surgical split), leaving
         the rest of the road intact;
     (c) an edge properly crossing the blocker (cut whole — it drives over the
-        unverified crossing)."""
-    TOL = 12.0  # m
+        unverified crossing).
 
-    def dist_to_poly(p, pts):
-        return min(project_to_segment(p, a, b)[2] for a, b in zip(pts, pts[1:]))
-
-    def nearest_node(p):
-        bi, bd = None, None
-        for i, n in enumerate(nodes):
-            d = dist_m(p, n)
-            if bd is None or d < bd:
-                bi, bd = i, d
-        return bi, bd
-
-    def poly_mid(pts):
-        return poly_midpoint(pts)   # TRUE midpoint — see poly_midpoint (D89)
+    Every rule and tolerance comes from classify_blocker — this routine decides only what to
+    DO about a realisation, never whether there is one (D90 F3)."""
 
     def nearest_vertex_idx(pts, p):
         return min(range(len(pts)), key=lambda i: dist_m(pts[i], p))
-
-    pair_cut: set[frozenset] = set()
-    for line in blockers:
-        ia, da = nearest_node(line[0])
-        ib, db = nearest_node(line[-1])
-        if ia != ib and da <= 40 and db <= 40:
-            pair_cut.add(frozenset((ia, ib)))
 
     out: list[dict] = []
     cuts = 0
@@ -403,62 +511,49 @@ def cut_blocked_edges(
     queue = list(edges)
     while queue:
         e = queue.pop()
-        if frozenset((e["a"], e["b"])) in pair_cut:
-            cuts += 1
-            continue
         pts = e["pts"]
         acted = False
         done = e.get("_done") or set()
         for bi, line in enumerate(blockers):
             if bi in done:
                 continue  # this lineage already had blocker bi cut out
-            bmid = poly_mid(line)
-            if dist_to_poly(bmid, pts) <= TOL:
-                # (b) seam inside this edge: remove the overlapped span
-                i0 = nearest_vertex_idx(pts, line[0])
-                i1 = nearest_vertex_idx(pts, line[-1])
-                lo, hi = min(i0, i1), max(i0, i1)
-                if hi == lo:  # blocker shorter than vertex spacing — still
-                    hi = min(lo + 1, len(pts) - 1)  # remove one whole segment
-                    lo = max(0, lo - (1 if hi == lo else 0))
-                hit.add(bi)
-                cuts += 1
-                acted = True
-                left, right = pts[: lo + 1], pts[hi:]
-                # each remnant becomes a stub ending at a NEW node
-                for part in (left, right):
-                    if len(part) >= 2 and sum(
-                        dist_m(a, b) for a, b in zip(part, part[1:])
-                    ) > 5:
-                        nid = len(nodes)
-                        nodes.append(part[-1] if part is left else part[0])
-                        stub = dict(e)
-                        stub["pts"] = part
-                        stub["_done"] = done | {bi}
-                        if part is left:
-                            stub["b"] = nid
-                        else:
-                            stub["a"] = nid
-                        queue.append(stub)  # re-check: another blocker may overlap
-                break
-            crossed = False
-            for i in range(len(pts) - 1):
-                for j in range(len(line) - 1):
-                    if _segs_properly_intersect(pts[i], pts[i + 1], line[j], line[j + 1]):
-                        crossed = True
-                        break
-                if crossed:
-                    break
-            if crossed:
-                hit.add(bi)
-                cuts += 1
-                acted = True
-                break
+            r = classify_blocker(pts, line)
+            if r is None:
+                continue
+            hit.add(bi)
+            cuts += 1
+            acted = True
+            if r[0] == "crossing":
+                break       # drives over the join — the whole edge goes
+            # span: remove the overlapped stretch, leaving the rest of the road intact
+            i0 = nearest_vertex_idx(pts, line[0])
+            i1 = nearest_vertex_idx(pts, line[-1])
+            lo, hi = min(i0, i1), max(i0, i1)
+            if hi == lo:  # blocker shorter than vertex spacing — still
+                hi = min(lo + 1, len(pts) - 1)  # remove one whole segment
+                lo = max(0, lo - (1 if hi == lo else 0))
+            left, right = pts[: lo + 1], pts[hi:]
+            # each remnant becomes a stub ending at a NEW node
+            for part in (left, right):
+                if len(part) >= 2 and sum(
+                    dist_m(a, b) for a, b in zip(part, part[1:])
+                ) > 5:
+                    nid = len(nodes)
+                    nodes.append(part[-1] if part is left else part[0])
+                    stub = dict(e)
+                    stub["pts"] = part
+                    stub["_done"] = done | {bi}
+                    if part is left:
+                        stub["b"] = nid
+                    else:
+                        stub["a"] = nid
+                    queue.append(stub)  # re-check: another blocker may overlap
+            break
         if not acted:
             out.append(e)
-    unrealised = len(blockers) - len(hit) - len(pair_cut)
-    print(f"  blocked joins: {cuts} cut(s) ({len(pair_cut)} node-pair; {len(hit)} seam/crossing; "
-          f"~{max(unrealised, 0)} blocker(s) not present in the graph)")
+    unrealised = len(blockers) - len(hit)
+    print(f"  blocked joins: {cuts} cut(s); {len(hit)}/{len(blockers)} blocker(s) realised in "
+          f"the graph, ~{max(unrealised, 0)} not present")
     return out
 
 
@@ -516,14 +611,19 @@ def dedupe_parallel_edges(edges: list[dict]) -> list[dict]:
     return out
 
 
-def dedupe_same_corridor(edges: list[dict], tol_m: float = 15.0) -> list[dict]:
-    """After chain-merge, the double-drawn poster corridors surface as two (or
-    three) edges between the same junction pair whose geometry runs the same
-    physical road. The stub-level length heuristic can't catch these (short
-    parallel stubs differ >1.2x in length from snap noise), so test geometry:
-    drop the longer edge of a same-endpoints pair iff EVERY point of it lies
-    within tol_m of the kept edge — a genuine second road (loop) diverges."""
+CORRIDOR_TOL_M = 15.0
 
+
+def within_corridor(cand_pts, kept_pts, tol_m: float = CORRIDOR_TOL_M) -> bool:
+    """Does `cand` run the same physical road as `kept`? Every point of cand within tol of kept.
+
+    DIRECTIONAL, and that matters: it must be asked of the LONGER edge against the SHORTER
+    (see dedupe_same_corridor). Asked the other way it is nearly always true and means nothing
+    — a via-less edge consists of just its two endpoints, which for a same-endpoints pair lie
+    exactly ON the other edge, so it scores as a duplicate of every road joining those nodes.
+    test_network_invariants.py reimplemented this rule without the ordering and reported the
+    g212/g293 loop as a duplicate the moment one appeared (D90). Shared, so it cannot drift.
+    """
     def seg_point_m(p, a, b) -> float:
         ax, ay = a[0] * M_PER_DEG_LNG, a[1] * M_PER_DEG_LAT
         bx, by = b[0] * M_PER_DEG_LNG, b[1] * M_PER_DEG_LAT
@@ -533,13 +633,19 @@ def dedupe_same_corridor(edges: list[dict], tol_m: float = 15.0) -> list[dict]:
         t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px_ - ax) * dx + (py_ - ay) * dy) / L2))
         return math.hypot(px_ - (ax + t * dx), py_ - (ay + t * dy))
 
-    def within_corridor(cand: dict, kept: dict) -> bool:
-        kp = kept["pts"]
-        return all(
-            min(seg_point_m(p, kp[j], kp[j + 1]) for j in range(len(kp) - 1)) <= tol_m
-            for p in cand["pts"]
-        )
+    return all(
+        min(seg_point_m(p, kept_pts[j], kept_pts[j + 1]) for j in range(len(kept_pts) - 1)) <= tol_m
+        for p in cand_pts
+    )
 
+
+def dedupe_same_corridor(edges: list[dict], tol_m: float = CORRIDOR_TOL_M) -> list[dict]:
+    """After chain-merge, the double-drawn poster corridors surface as two (or
+    three) edges between the same junction pair whose geometry runs the same
+    physical road. The stub-level length heuristic can't catch these (short
+    parallel stubs differ >1.2x in length from snap noise), so test geometry:
+    drop the longer edge of a same-endpoints pair iff EVERY point of it lies
+    within tol_m of the kept edge — a genuine second road (loop) diverges."""
     by_pair: dict[frozenset, list[dict]] = {}
     loops: list[dict] = []
     for e in edges:
@@ -550,10 +656,10 @@ def dedupe_same_corridor(edges: list[dict], tol_m: float = 15.0) -> list[dict]:
     out: list[dict] = list(loops)
     dropped = 0
     for group in by_pair.values():
-        group = sorted(group, key=_edge_len)
+        group = sorted(group, key=_edge_len)   # shortest first: it is the one we keep
         keep = [group[0]]
         for e in group[1:]:
-            if any(within_corridor(e, k) for k in keep):
+            if any(within_corridor(e["pts"], k["pts"], tol_m) for k in keep):
                 dropped += 1
             else:
                 keep.append(e)
@@ -672,10 +778,17 @@ def main() -> None:
         print(f"  [{_time.time()-_t0:7.1f}s] {msg}", flush=True)
     lines = load_lines(args.geojson)
     _stage(f"loaded {len(lines)} lines")
+    active: set[str] = set()
     for cpath in args.connectors:
         extra = load_lines(cpath)
-        print(f"  + {len(extra)} connector line(s) from {cpath.name}")
+        ids = sorted(x["fix"] for x in extra if x.get("fix"))
+        active.update(ids)
+        print(f"  + {len(extra)} connector line(s) from {cpath.name}: {', '.join(ids) or '(unnamed)'}")
         lines.extend(extra)
+    # Every connector that reaches the graph is named in the output, so the invariants can
+    # assert the ACTIVE SET against an allow-list. `closed_to_guests` catches a line that
+    # admits what it is; this catches one that does not (D90 F1).
+    print(f"  active connectors: {' '.join(sorted(active)) or '(none)'}")
     nodes, edges = node_lines(lines)
     _stage(f"noded: {len(nodes)} nodes, {len(edges)} edges")
     if args.block:

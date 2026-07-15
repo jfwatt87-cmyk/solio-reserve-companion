@@ -12,11 +12,12 @@ list" after it had been moved, and sites carried `crossing_confirmed=false` next
 decisions are authored ONCE, in the manifest, and everything else is generated.
 
 Geometry comes from Solio_Joins_Best_Guess.geojson (the join lines); the manifest
-supplies only the decision. A site's status routes it to a file:
+supplies only the decision. A site is CUT unless guest_routable is exactly true —
+"unknown" cuts just like false — and `closure` picks which file it lands in:
 
-    unconfirmed -> blockers.unconfirmed-crossings.geojson   (open; may yet reopen)
-    private     -> blockers.permanent.geojson               (settled; never reopens)
-    confirmed   -> not blocked at all
+    not routable + closure=open    -> blockers.open.geojson        (may reopen on an answer)
+    not routable + closure=settled -> blockers.permanent.geojson   (never reopens)
+    guest_routable=true            -> not blocked at all
 """
 from __future__ import annotations
 
@@ -27,67 +28,145 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / "crossing_decisions.json"
 JOINS = HERE.parent / "gis" / "Solio_Joins_Best_Guess.geojson"
-UNCONFIRMED = HERE / "blockers.unconfirmed-crossings.geojson"
+# Renamed from blockers.unconfirmed-crossings.geojson (D90 F2): it now also holds S06, a
+# crossing we know EXISTS and simply have no permission answer for. A file called
+# "unconfirmed-crossings" holding a confirmed crossing is the same species of lie the
+# reviews keep finding — a name that claims something other than what it contains.
+OPEN = HERE / "blockers.open.geojson"
 PERMANENT = HERE / "blockers.permanent.geojson"
 
 CRS = {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}
 
 
-def load_manifest() -> dict:
+def no_duplicate_keys(pairs):
+    """json.loads hook: a repeated key is an error, not last-one-wins.
+
+    D90 F5. Adding a SECOND top-level "description" reading "All crossings are confirmed safe"
+    passed every check, because `json.loads` silently keeps the last of a duplicated key while
+    the file a human (or a GIS tool) reads may show the first. A file that parses to something
+    other than what it says is exactly the failure these checks exist to catch.
+    """
+    seen: dict = {}
+    for k, v in pairs:
+        if k in seen:
+            raise SystemExit(f"duplicate JSON key {k!r} — a file that parses differently from "
+                             f"how it reads is not a source of truth")
+        seen[k] = v
+    return seen
+
+
+TRI = (True, False, "unknown")
+
+
+def blocked(s: dict) -> bool:
+    """Cut unless we have an affirmative YES. `unknown` cuts exactly like `false`.
+
+    The whole point of the tri-state: not-yet-asked and asked-and-refused have different
+    answers, different owners and different futures — but the identical routing consequence.
+    """
+    return s["guest_routable"] is not True
+
+
+def load_manifest(joins: dict | None = None) -> dict:
     m = json.loads(MANIFEST.read_text())
     sites = m["sites"]
     for sid, s in sites.items():
-        if s["status"] not in ("confirmed", "unconfirmed", "private"):
-            raise SystemExit(f"{sid}: unknown status {s['status']!r}")
-        # A confirmed site is routable; anything cut is not. Catch the contradiction
-        # that shipped on 14 Jul (confirmed-but-closed, or unconfirmed-but-routable).
-        if (s["status"] == "confirmed") != bool(s["guest_routable"]):
-            raise SystemExit(
-                f"{sid}: status={s['status']} contradicts guest_routable={s['guest_routable']}")
+        for axis in ("crossing_exists", "guest_routable"):
+            if s.get(axis) not in TRI:
+                raise SystemExit(f"{sid}: {axis}={s.get(axis)!r} — must be true, false or \"unknown\"")
+        if s["closure"] not in ("open", "settled"):
+            raise SystemExit(f"{sid}: closure={s['closure']!r} — must be 'open' or 'settled'")
+        # You cannot drive through a crossing that is not there. The axes are independent,
+        # not unrelated: this is the ONE implication that holds between them.
+        if s["guest_routable"] is True and s["crossing_exists"] is not True:
+            raise SystemExit(f"{sid}: guest_routable=true but crossing_exists="
+                             f"{s['crossing_exists']!r} — routable through what?")
+        if s["guest_routable"] is True:
+            if s.get("routable_basis") not in ("recorded-drive", "quote", "inference"):
+                raise SystemExit(f"{sid}: routable with no routable_basis — say WHY a guest may "
+                                 f"drive here (recorded-drive | quote | inference)")
+        elif s.get("routable_basis") is not None:
+            raise SystemExit(f"{sid}: routable_basis={s['routable_basis']!r} on a site that is "
+                             f"not routable — a basis for a claim we are not making")
+    if joins is not None:
+        check_basis_against_evidence(sites, joins)
     return m
 
 
-def build() -> dict[Path, dict]:
-    man = load_manifest()
-    sites = man["sites"]
-    joins = json.loads(JOINS.read_text())
+def check_basis_against_evidence(sites: dict, joins: dict) -> None:
+    """`routable_basis: "recorded-drive"` must be backed by a recorded drive.
 
-    out: dict[str, list] = {"unconfirmed": [], "private": []}
+    It was free text. Round 3 set S06 to "recorded-drive" — a site with zero recorded river
+    crossings — and the whole suite stayed green (D90 F2). A basis nobody checks is decoration:
+    it describes the evidence we would like to have rather than the evidence we have.
+    """
+    by_site: dict[str, list] = {}
+    for f in joins["features"]:
+        sid = f["properties"].get("site")
+        if sid:
+            by_site.setdefault(sid, []).append(f["properties"])
+    for sid, s in sites.items():
+        if s.get("routable_basis") != "recorded-drive":
+            continue
+        ev = by_site.get(sid, [])
+        if not any(p.get("crossing_confirmed") is True or (p.get("river_cross_events_150m") or 0) > 0
+                   for p in ev):
+            raise SystemExit(
+                f"{sid}: routable_basis='recorded-drive' but no join here records a drive crossing "
+                f"the river (crossing_confirmed / river_cross_events_150m). Either the basis is "
+                f"wrong or the evidence is — do not resolve it by editing the evidence.")
+
+
+def block_reason(s: dict) -> str:
+    """WHY this site is cut. Three different situations, three different owners."""
+    if s["guest_routable"] is False:
+        return "private-access"          # asked and closed — Solio's decision, settled
+    if s["crossing_exists"] is not True:
+        return "crossing-unconfirmed"    # we have not established there is a crossing at all
+    return "permission-unknown"          # the crossing is real; nobody has asked if guests may use it
+
+
+def build(joins: dict | None = None) -> dict[Path, dict]:
+    joins = joins if joins is not None else json.loads(JOINS.read_text())
+    man = load_manifest(joins)
+    sites = man["sites"]
+
+    out: dict[str, list] = {"open": [], "settled": []}
     for f in joins["features"]:
         sid = f["properties"].get("site")
         if not sid or sid not in sites:
             continue
         s = sites[sid]
-        if s["status"] == "confirmed":
+        if not blocked(s):
             continue
-        bucket = "unconfirmed" if s["status"] == "unconfirmed" else "private"
         props = {
             "site": sid,
             "site_name": s.get("name"),
             "gap_m": f["properties"].get("gap_m"),
-            "status": s["status"],
+            "crossing_exists": s["crossing_exists"],
+            "guest_routable": s["guest_routable"],
+            "reason": block_reason(s),
             "quote": s.get("quote") or None,
             "decided": s.get("date"),
             "why": s.get("inference"),
         }
-        if s["status"] == "private":
-            props["reason"] = "private-access"
+        if s["closure"] == "settled":
             props["agreed_by"] = s.get("agreed_by")
-        else:
-            props["reason"] = "unconfirmed"
-            if s.get("likely_endpoint"):
-                props["likely_endpoint"] = True
-        out[bucket].append({"type": "Feature", "properties": props, "geometry": f["geometry"]})
+        if s.get("likely_endpoint"):
+            props["likely_endpoint"] = True
+        out[s["closure"]].append({"type": "Feature", "properties": props, "geometry": f["geometry"]})
 
     return {
-        UNCONFIRMED: {
+        OPEN: {
             "type": "FeatureCollection",
-            "name": "Solio_Blockers_Unconfirmed",
-            "description": ("Crossings NOT confirmed drivable — cut from the routing graph. OPEN: "
-                            "if Solio ever confirms one, unblocking is the correct response. "
+            "name": "Solio_Blockers_Open",
+            "description": ("Crossings cut pending an ANSWER — either we have not established the "
+                            "crossing exists (reason=crossing-unconfirmed) or it does exist and "
+                            "nobody has asked whether guests may drive it (reason=permission-unknown). "
+                            "OPEN: if Solio answers, unblocking is the correct response. "
                             "GENERATED from crossing_decisions.json — do not hand-edit."),
             "crs": CRS,
-            "features": out["unconfirmed"],
+            "features": out["open"],
         },
         PERMANENT: {
             "type": "FeatureCollection",
@@ -96,7 +175,7 @@ def build() -> dict[Path, dict]:
                             "reversing the access decision lifts one. GENERATED from "
                             "crossing_decisions.json — do not hand-edit."),
             "crs": CRS,
-            "features": out["private"],
+            "features": out["settled"],
         },
     }
 
@@ -104,7 +183,7 @@ def build() -> dict[Path, dict]:
 # Decision fields on the joins file — generated, never hand-set. These are the exact
 # fields that contradicted each other on 14 Jul (D87 F7): a site advertised
 # guest_routable=true while the manifest had it cut.
-DECISION_FIELDS = ("site_confirmed", "guest_routable", "routable_basis", "site_name", "access",
+DECISION_FIELDS = ("crossing_exists", "guest_routable", "routable_basis", "site_name", "access",
                    "solio_said", "decided", "decision_note", "likely_endpoint")
 # Written by hand on 14 Jul, now stale or retracted. `route_cost_of_blocking` carried the
 # claim "zero — opening S05 changes no POI route", which D87 F2 RETRACTED as unproven.
@@ -128,10 +207,12 @@ def canonical_joins(man: dict) -> dict:
     crossing_confirmed=false — that is S06, confirmed by his words rather than by a drive —
     so the two are not in conflict, and decision_note says which is which.
     """
-    assert not (set(STALE_FIELDS) & set(EVIDENCE_FIELDS)), \
-        "a field cannot be both stale and evidence — that is how the notes were destroyed"
+    if set(STALE_FIELDS) & set(EVIDENCE_FIELDS):
+        # Not an `assert`: `python -O` strips those, and this one is load-bearing (D90 F4).
+        raise SystemExit("a field cannot be both stale and evidence — that is how the notes "
+                         "were destroyed on 15 Jul (D89)")
     sites = man["sites"]
-    d = json.loads(JOINS.read_text())
+    d = json.loads(JOINS.read_text(), object_pairs_hook=no_duplicate_keys)
     for f in d["features"]:
         sid = f["properties"].get("site")
         if sid not in sites:
@@ -140,17 +221,15 @@ def canonical_joins(man: dict) -> dict:
         for k in STALE_FIELDS:
             pr.pop(k, None)
         s = sites[sid]
-        # TWO AXES (D89). Deriving both from `status == "confirmed"` put site_confirmed:false
-        # next to "Real crossing..." on S18/S20 — a real crossing guests may not use.
-        exists = s["status"] in ("confirmed", "private")
-        confirmed = s["status"] == "confirmed"
-        pr["site_confirmed"] = exists          # is there a crossing here?
-        pr["guest_routable"] = confirmed       # may a guest drive through it?
-        pr["routable_basis"] = s.get("routable_basis") or ("quote" if confirmed else None)
+        # PUBLISHED, not derived. Both axes are authored in the manifest; this copies them.
+        pr["crossing_exists"] = s["crossing_exists"]
+        pr["guest_routable"] = s["guest_routable"]
+        pr["routable_basis"] = s.get("routable_basis")
         pr["site_name"] = s.get("name")
         pr["solio_said"] = s.get("quote") or None
         pr["decided"] = s.get("date")
-        if s["status"] == "private":
+        pr.pop("site_confirmed", None)   # renamed to crossing_exists (D90 F2)
+        if s["guest_routable"] is False:
             pr["access"] = "private"
         else:
             pr.pop("access", None)
@@ -158,19 +237,35 @@ def canonical_joins(man: dict) -> dict:
             pr["likely_endpoint"] = True
         else:
             pr.pop("likely_endpoint", None)   # must clear if the manifest flag goes away
-        pr["decision_note"] = (
-            ("Crossing exists and guests may drive it." if confirmed else
-             "NOT confirmed to exist as a drivable crossing — cut from routing."
-             if s["status"] == "unconfirmed" else
-             "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement.")
-            + " Decision authored in crossing_decisions.json — do not hand-edit this field.")
+        # The note must say exactly what the axes say — no more. The old text asserted
+        # "Crossing exists and guests may drive it" for ANY confirmed site, which on S06 sat
+        # beside "no recorded drive crosses the river" and "please confirm" in the same
+        # properties bag (D90 F2). Every branch below is now reachable from the axes alone.
+        if s["guest_routable"] is True:
+            note = {"recorded-drive": "Crossing exists and guests may drive it — a recorded drive "
+                                      "crossed the river here.",
+                    "quote": "Crossing exists and guests may drive it — Solio's words say so.",
+                    "inference": "Crossing exists. Guests may drive it — INFERRED by us, not "
+                                 "stated by Solio; see `why` in the manifest."}[s["routable_basis"]]
+        elif s["guest_routable"] is False:
+            note = ("Crossing EXISTS and is confirmed; closed to guest through-routing by "
+                    "agreement." if s["crossing_exists"] is True else
+                    "Closed to guest routing by agreement.")
+        else:
+            note = ("Crossing exists; whether guests may drive through it is UNKNOWN — nobody has "
+                    "asked. Cut from routing until answered."
+                    if s["crossing_exists"] is True else
+                    "NOT established as a drivable crossing — cut from routing until answered.")
+        pr["decision_note"] = note + (" Decision authored in crossing_decisions.json — "
+                                      "do not hand-edit this field.")
     return d
 
 
 def main() -> None:
     check = "--check" in sys.argv
-    man = load_manifest()
-    built = build()
+    joins = json.loads(JOINS.read_text(), object_pairs_hook=no_duplicate_keys)
+    man = load_manifest(joins)
+    built = build(joins)
     # --check must cover EVERYTHING this script owns, not just the files it is named
     # after. It used to verify the two blocker files only and silently ignore the joins
     # sync — so removing a site from the manifest, editing a joins field, or corrupting

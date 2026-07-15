@@ -19,7 +19,9 @@ None of that was caught by a test, because no test compared the files to each ot
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,7 +38,17 @@ def check(name: str, ok: bool, detail: str) -> None:
 
 
 def main() -> None:
+    sys.path.insert(0, str(HERE))
+    from build_blockers import blocked, no_duplicate_keys  # noqa: E402 — one definition each
     man = json.loads((HERE / "crossing_decisions.json").read_text())["sites"]
+
+    # The exact inventory, spelled out. "every site in the joins file is in the manifest" is
+    # satisfied by an EMPTY manifest and an empty joins file, and round 3 slipped a site past
+    # it by setting `site` to null — the site stopped existing rather than failing (D90 F4).
+    expect = {f"S{i:02d}" for i in range(1, 23)}
+    check("the manifest holds exactly S01..S22", set(man) == expect,
+          f"{len(man)} sites" if set(man) == expect
+          else f"missing={sorted(expect - set(man))} unexpected={sorted(set(man) - expect)}")
 
     # 1. blocker files are exactly what the manifest generates
     import subprocess
@@ -49,27 +61,40 @@ def main() -> None:
     #    contradiction that shipped: a site cut by the manifest while the joins
     #    file advertised it as routable/confirmed.
     joins = json.loads((GIS / "Solio_Joins_Best_Guess.geojson").read_text())["features"]
-    # TWO AXES (D89) — a crossing can exist AND be closed to guests. That is S18/S20.
-    # Checking them as one axis is what produced "site_confirmed:false" beside
-    # "Real crossing..." on the same feature.
+    # TWO INDEPENDENT AXES (D90 F2). D89 named them and still derived both from one `status`,
+    # so "the crossing exists but nobody has asked whether guests may use it" — the actual S06
+    # situation — could not be said at all, and got rounded up to routable.
+    def same(a, b) -> bool:
+        """Equal AND the same type. `True == 1` and `False == 0` in Python, so a plain `==`
+        would read a stray 1 as a confirmed crossing. `is` is not the answer either: it is
+        true for the True/False/None singletons but not for two equal strings parsed out of
+        two different JSON files, which quietly failed every tri-state site."""
+        if isinstance(a, bool) != isinstance(b, bool):
+            return False
+        return a == b
+
     bad = []
     for f in joins:
         p = f["properties"]
         sid = p.get("site")
         if sid not in man:
             continue
-        status = man[sid]["status"]
-        want_exists = status in ("confirmed", "private")
-        want_routable = status == "confirmed"
-        if p.get("site_confirmed") is not None and bool(p["site_confirmed"]) != want_exists:
-            bad.append(f"{sid}: joins site_confirmed={p['site_confirmed']} but manifest {status} means exists={want_exists}")
-        if p.get("guest_routable") is not None and bool(p["guest_routable"]) != want_routable:
-            bad.append(f"{sid}: joins guest_routable={p['guest_routable']} vs manifest {status}")
-        # a routable claim that is an inference must SAY so — never laundered as quoted
-        if want_routable and p.get("routable_basis") not in ("quote", "inference", "recorded-drive"):
-            bad.append(f"{sid}: routable with no routable_basis recorded")
+        s = man[sid]
+        for axis in ("crossing_exists", "guest_routable"):
+            if axis in p and not same(p[axis], s[axis]):
+                bad.append(f"{sid}: joins {axis}={p[axis]!r} but manifest says {s[axis]!r}")
+        if p.get("routable_basis") != s.get("routable_basis"):
+            bad.append(f"{sid}: joins routable_basis={p.get('routable_basis')!r} "
+                       f"vs manifest {s.get('routable_basis')!r}")
     check("joins file agrees with the manifest (both axes)", not bad,
           "; ".join(sorted(set(bad))) or "no contradictions")
+
+    # An inference must never read as a statement of fact. The joins file is client-visible.
+    laundered = [f["properties"]["site"] for f in joins
+                 if f["properties"].get("routable_basis") == "inference"
+                 and "INFERRED" not in (f["properties"].get("decision_note") or "")]
+    check("an inferred routing claim says it is inferred", not laundered,
+          "no laundered inferences" if not laundered else f"LAUNDERED on {sorted(set(laundered))}")
 
     # EVERY site must be in the inventory. A site that is merely absent from the manifest
     # is ungoverned: nothing blocks it, nothing checks it, and it stays routable. Deleting
@@ -84,6 +109,45 @@ def main() -> None:
             if f["properties"].get("site") in man and not f["properties"].get("evidence_note")]
     check("evidence_note survives on managed joins", not lost,
           f"{len(joins)} joins carry evidence" if not lost else f"LOST on {sorted(set(lost))}")
+
+    # ...and it must be the SAME evidence. Non-emptiness is not integrity: round 3 replaced S06's
+    # note with "recorded drive proves guests crossed here" — a fabrication — and every check
+    # passed (D90 F4). Nor can we compare against anything the generator writes: canonical_joins
+    # reads geometry and evidence from the very file it then compares to, so those fields are
+    # canonical by definition and cannot disagree with themselves.
+    #
+    # So: compare to GIT. f271601 is the last commit before any decision text touched this file
+    # (fb6554f already carried five polluted S05 notes). A commit hash is the one reference in
+    # this repo that cannot be edited to agree with a mistake. If a new survey ever legitimately
+    # changes the evidence, repin this hash deliberately, in a commit that says why.
+    EVIDENCE_PINNED_AT = "f271601"
+    EV = ("evidence_note", "confidence", "crossing_confirmed", "gpx_points_near", "gpx_crossings",
+          "river_cross_events_150m", "on_river", "gap_m", "kind")
+
+    def digest(features, rename_note: bool) -> dict[str, str]:
+        out = {}
+        for f in features:
+            p = f["properties"]
+            ev = {k: p.get(k) for k in EV if k in p}
+            if rename_note and "note" in p and "evidence_note" not in p:
+                ev["evidence_note"] = p["note"]      # renamed by D89; same text
+            key = hashlib.sha256(json.dumps(f["geometry"], sort_keys=True).encode()).hexdigest()
+            out[key] = hashlib.sha256(json.dumps(ev, sort_keys=True).encode()).hexdigest()
+        return out
+
+    r = subprocess.run(["git", "show", f"{EVIDENCE_PINNED_AT}:tools/gis/Solio_Joins_Best_Guess.geojson"],
+                       capture_output=True, text=True, cwd=HERE.parents[1])
+    if r.returncode != 0:
+        check("evidence matches git", False, f"cannot read {EVIDENCE_PINNED_AT}: {r.stderr.strip()[:80]}")
+    else:
+        want = digest(json.loads(r.stdout)["features"], rename_note=True)
+        got = digest(joins, rename_note=False)
+        drift = sorted(k for k in want if want[k] != got.get(k))
+        check(f"evidence is byte-identical to {EVIDENCE_PINNED_AT}",
+              not drift and set(want) == set(got),
+              f"{len(want)} joins, evidence and geometry unchanged" if not drift and set(want) == set(got)
+              else f"{len(drift)} join(s) have altered evidence; "
+                   f"{len(set(want) - set(got))} geometries missing, {len(set(got) - set(want))} added")
 
     # 3. the client export makes no access claim on a road edge — we cannot
     #    substantiate one, and the last attempt asserted a falsehood (F3/F4)
@@ -103,7 +167,7 @@ def main() -> None:
     if x_path.exists():
         x = json.loads(x_path.read_text())["features"]
         described = {f["properties"]["site"] for f in x}
-        cut = {s for s, v in man.items() if v["status"] != "confirmed"}
+        cut = {s for s, v in man.items() if blocked(v)}
         check("export: every cut site is described", described == cut,
               f"described={sorted(described)} cut={sorted(cut)}")
         wrong = [f["properties"]["site"] for f in x
@@ -129,11 +193,18 @@ def main() -> None:
                      (GIS / "Solio_Roads_V2_WGS84_crossings.geojson",
                       tmp.with_name(tmp.stem + "_crossings.geojson"))]
             for committed, fresh in pairs:
-                same = (json.loads(committed.read_text()) == json.loads(fresh.read_text())
-                        if committed.exists() and fresh.exists() else False)
-                n = len(json.loads(committed.read_text())["features"]) if committed.exists() else 0
-                check(f"export matches the exporter: {committed.name}", same,
-                      f"{n} features, identical" if same
+                # BYTE equality, not parsed equality. `json.loads` silently keeps the last of a
+                # duplicated key, so a second top-level "description" reading "All crossings are
+                # confirmed safe" compared equal to the honest one and shipped (D90 F5). What a
+                # reader sees is the bytes; that is what must match.
+                ok = (committed.exists() and fresh.exists()
+                      and committed.read_bytes() == fresh.read_bytes())
+                n = 0
+                if committed.exists():
+                    parsed = json.loads(committed.read_text(), object_pairs_hook=no_duplicate_keys)
+                    n = len(parsed["features"])
+                check(f"export matches the exporter: {committed.name}", ok,
+                      f"{n} features, byte-identical" if ok
                       else "DIFFERS from freshly generated — stale or hand-edited")
 
     if fails:

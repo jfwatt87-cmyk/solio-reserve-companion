@@ -138,7 +138,7 @@ told us *what each place is*, which is not always the same as *you can drive it*
 
 | Site | Callan's words | Applied |
 |------|----------------|---------|
-| S06 | "Crossing" | **unblocked** — crossing confirmed. Name NOT confirmed: the "Browns Bridge" guess is dropped, not proven (he never said Browns). |
+| S06 | "Crossing" | ~~**unblocked** — crossing confirmed.~~ **RE-BLOCKED 2026-07-15 (D90 F2).** "Crossing" confirms the crossing EXISTS; it says nothing about whether guests may drive it, and nobody asked. `crossing_exists=true, guest_routable="unknown"` → cut. Name NOT confirmed either: the "Browns Bridge" guess is dropped, not proven (he never said Browns). |
 | S16 | "Part of the Mount Kenya River Road" | **unblocked** |
 | S21 | "Orphanage Road - Looks good" | **unblocked** — and our "likely Waterbuck Bridge" guess was WRONG. Waterbuck is now unlocated. |
 | S18, S20 | "Marriotts Private Road - May be a good idea to restrict access here" | **stays blocked.** Crossings are real (`site_confirmed=true`, `access=private`) but he's asking to keep guests off, so confirming them must not silently route guests down a private road. `guest_routable=false`. Needs a firm yes/no — "may be a good idea" is a suggestion. The parked `jw-bridge` connector stays parked. |
@@ -150,11 +150,16 @@ told us *what each place is*, which is not always the same as *you can drive it*
   alone has 8). Site truth and join-geometry truth are different claims.
 - Each remaining blocker now carries `still_blocked_because` so the reason
   survives without this file.
-- **Result: safe mode's cost is now nil.** The three ~+20% kingfisher regressions
+- ~~**Result: safe mode's cost is now nil.** The three ~+20% kingfisher regressions
   above are exactly what S06/S16/S21 recovered: kingfisher->naribo 9.18 -> 7.58 km,
   kingfisher->yellowthorn 7.33 -> 6.18 km, rhinogate->kingfisher 10.95 -> 9.36 km.
-  Avg detour 1.52 -> **1.49**. gate->orphanage holds at 2.43 km. All 9 invariants
-  pass incl. "safe mode holds: 0 edges cross a blocker"; `tsc --noEmit` clean.
+  Avg detour 1.52 -> **1.49**.~~
+  **RETRACTED 2026-07-15 (D90 F2).** Those recoveries were bought by unblocking S06 on an
+  over-read, and S16/S21 contributed nothing. With S06 re-blocked pending an answer, all
+  three regressions are back and safe mode's cost is **15/36 POI pairs, worst case
+  +1.60 km**. Nothing becomes unreachable. That cost is real and is the reason to ask
+  Callan — it was never a reason to assume his answer.
+  gate->orphanage holds at 2.43 km. `tsc --noEmit` clean.
 - Not deployed. `NAV_ENABLED` remains `false`.
 
 ## Marriotts private road CLOSED to guests — blockers split (2026-07-14)
@@ -226,8 +231,12 @@ evidence and was then written into a file as fact:**
   and "Orphanage Road, looks good" NAME ROADS. Neither says the river join we inferred
   is a real, guest-drivable crossing. That is the rule stated 200 lines above in this
   very file — broken within the hour, on the next site. **Reblocked.** Measured cost:
-  **zero POI pairs**, so there was never anything to gain. S06 ("Crossing") speaks to
-  drivability and alone recovers all three Kingfisher detours.
+  **zero POI pairs**, so there was never anything to gain. ~~S06 ("Crossing") speaks to
+  drivability and alone recovers all three Kingfisher detours.~~ **CORRECTED 2026-07-15
+  (D90 F2): "Crossing" speaks to TOPOLOGY, not drivability.** It is the same over-read this
+  very finding is about, made in the sentence that describes the over-read. S06 alone does
+  recover all three Kingfisher detours — that part is measured and true — but a route
+  benefit is not permission. S06 is now cut pending an answer.
 - **F2 — "opening S05 costs zero routes" is RETRACTED.** The experiment's extra node-pair
   lands in a component that gets pruned, so the identical SHA proved nothing; a plausible
   real connection moves 8/36 pairs. S05 stays cut, but as **unconfirmed + likely_endpoint**,
@@ -251,12 +260,82 @@ evidence and was then written into a file as fact:**
   proper crossing* — adjacency is not a leak, since every road that stops at the river
   touches a join. Six fixtures pin it: my first two attempts both passed live data while
   misclassifying fixtures.
+  **SUPERSEDED 2026-07-15 (D90 F3)** — see below; that predicate was wrong too, and the
+  six fixtures did not pin it.
+
+---
+
+## 2026-07-15 — review round 3 (D90). Verdict: *do not sign off*.
+
+Third adversarial review of this pipeline; third round that found real defects, this time in
+round 2's fixes. Full spec: `Solio Vault/Roads Review — Findings & Remediation Spec`.
+
+- **F1 (CRITICAL) — the parked private crossing bypassed every blocker.** `jw-bridge`, the
+  Marriotts crossing, sits in `connectors.unconfirmed.geojson` marked `access=private`,
+  `guest_routable=false`, "DO NOT RE-ADD for guest routing". The only thing keeping it out
+  was that nobody passes that file to `--connectors` — and its predecessor note actively
+  invited re-adding it ("when Callan confirms S20"; he has). Copied into
+  `connectors.bridges.geojson` it imported **clean**: none of the eight S20 blockers reaches
+  it (nearest endpoint 44.5 m > the 40 m tolerance; nearest midpoint 53.3 m > 12 m), the whole
+  suite stayed green, gate→jw dropped 6.64 → 6.43 km **through the private drive**, and the
+  exporter stripped `access` and shipped it to Callan as ordinary road.
+  **Fix:** access policy is now IDENTITY, not proximity. `load_lines` refuses any line whose
+  own properties say guests may not drive it — whatever file it is in, no override flag. An
+  allow-list pins the active connector set by name for the one that arrives unmarked. A
+  regression imports the real `jw-bridge` and proves it is rejected.
+- **F2 (HIGH) — the "two axes" were one axis, and S06 was still promoted beyond evidence.**
+  D89 named `crossing_exists` and `guest_routable` and then derived both from one `status`,
+  so only three combinations existed and `load_manifest` rejected the rest. The case we
+  actually had — *the crossing is real; nobody has asked whether guests may use it* — was
+  **unrepresentable**, so it was rounded up to `confirmed`. Writing `routable_basis:
+  inference` beside `guest_routable: true` labelled the guess without stopping the app acting
+  on it. `routable_basis` was free text: setting S06 to `recorded-drive`, with zero recorded
+  crossings, passed everything.
+  **Fix:** both axes are stored, tri-state (`true|false|"unknown"`), neither derived. Cut
+  unless `guest_routable is true`. `recorded-drive` is checked against the joins evidence.
+  **S06 is re-blocked** at a measured cost of 15/36 POI pairs (worst +1.60 km, nothing
+  unreachable), pending one question: *may guests drive through S06?*
+- **F3 (HIGH) — the predicate was wrong for the fourth time, and the cutter never used it.**
+  Despite the "ONE definition" comment, `cut_blocked_edges` reimplemented the rules with its
+  own hard-coded 12 and 40: changing the cutter's tolerance to 11 left the suite green. The
+  predicate itself was orientation-dependent (a segment touching a blocker end scored as a
+  crossing written one way and not the other), read a road ending at a join's midpoint as a
+  seam, missed a road connecting both ends via internal vertices, and accepted a 1.1 km
+  U-shaped detour as a crossing.
+  **Fix:** one `classify_blocker`, used by the cutter and the test, with one set of
+  constants. Strict orientation-invariant straddle; seams require ≥90% along-join coverage;
+  spanning requires the road to actually cover the join (≥50% of its length) and not wander
+  (≤2.5×). 13 fixtures + boundary cases, including one live-data catch: a 557 m road *ending*
+  at 30.7 m S18 scored as spanning it, because "near both ends" is satisfiable by a single
+  point whenever the join is shorter than the 40 m tolerance. **The network is unchanged by
+  every one of these fixes** — the bugs were real, the guarantee was false, the road data
+  never happened to hit them.
+- **F4 (MEDIUM) — the guards trusted the file they were checking.** `canonical_joins` reads
+  geometry and evidence from the very file it then compares against, so those fields were
+  canonical by definition: corrupting S06's geometry, or replacing its evidence with the
+  fabrication *"recorded drive proves guests crossed here"*, passed. Setting `site` to `null`
+  passed with "21 sites governed". The `assert` guarding the stale/evidence overlap is
+  stripped by `python -O`.
+  **Fix:** evidence is hashed against **git** (`f271601`, the last commit before decision text
+  touched the file) — the one reference in this repo that cannot be edited to agree with a
+  mistake. The inventory asserts exactly S01..S22. The assert is now a raise.
+- **F5 (LOW) — duplicate JSON keys and stale prose.** A second top-level `description` reading
+  "All crossings are confirmed safe" compared equal, because `json.loads` keeps the last of a
+  duplicated key. **Fix:** duplicate keys raise; exports compare byte-for-byte.
+
+Round 3 also confirmed, independently: the D89 evidence restore from `f271601` was exact
+(all 208 notes, verified by hash); `fb6554f` was indeed already polluted; blocking S06 does
+change 15/36 pairs; and the narrow name "private crossings not traversed" is honest.
 
 **Current state (authoritative):**
-- Unconfirmed (cut, may reopen if confirmed): **S05, S16, S21, S22** — 10 joins.
+- Cut pending an answer (`blockers.open.geojson`, renamed from `blockers.unconfirmed-crossings`
+  — it now holds a crossing we know exists):
+  - `crossing-unconfirmed` — **S05, S16, S21, S22** (10 joins): no established crossing.
+  - `permission-unknown` — **S06** (1 join): crossing is real; nobody has asked about guests.
 - Permanent (cut, never reopens): **S18/S20** `private-access` — 11 joins.
-- Confirmed and routable: **S06** — the only site Solio's words promoted.
-- Network `a2ffec03…`; 451 edges; 208.0 km. Emitted TS is ~88 KB, chain-merged.
+- Routable: the 15 sites proven by recorded drives. **No site is routable on words alone.**
+- Network `03b6b66e…`; 450 edges; 207.9 km. Emitted TS is ~88 KB, chain-merged.
 - Regenerate: `python3 tools/roads/build_blockers.py` then the importer with **both**
   `--block` files, then `export_v2_geojson.py`. `npm run test:roads` runs invariants +
-  consistency and must pass before committing.
+  consistency (30 checks) and must pass before committing.
+- Not deployed. `NAV_ENABLED` remains `false`, so no guest is routed anywhere by any of this.

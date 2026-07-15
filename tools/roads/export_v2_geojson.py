@@ -134,13 +134,14 @@ def main() -> None:
     # it is the only place we can substantiate one. Built from the blocker files, so a
     # cut crossing is DESCRIBED even though no road edge survives to carry a label.
     xfeats = []
-    for fname in ("blockers.unconfirmed-crossings.geojson", "blockers.permanent.geojson"):
+    for fname in ("blockers.open.geojson", "blockers.permanent.geojson"):
         for f in json.load(open(HERE / fname))["features"]:
             pr = f["properties"]
             xfeats.append({"type": "Feature", "geometry": f["geometry"], "properties": {
                 "site": pr.get("site"),
                 "site_name": pr.get("site_name"),
-                "status": pr.get("status"),
+                "crossing_exists": pr.get("crossing_exists"),
+                "guest_routable": pr.get("guest_routable"),
                 "reason": pr.get("reason"),
                 "routed_by_app": False,
                 "gap_m": pr.get("gap_m"),
@@ -149,16 +150,22 @@ def main() -> None:
             }})
     xfc = {"type": "FeatureCollection",
            "name": "Solio_Blocked_Crossings_V2",
-           "description": ("River crossings the app will NOT route over, and why. "
-                           "reason=unconfirmed — Solio has not confirmed the crossing is real and "
-                           "guest-drivable; naming the road is not the same as confirming you can "
-                           "drive through it, so these stay cut and may yet reopen if confirmed. "
+           "description": ("River crossings the app will NOT route over, and why. Each carries two "
+                           "SEPARATE facts: crossing_exists (is there a crossing here?) and "
+                           "guest_routable (may a guest drive through it?). Either can be "
+                           "\"unknown\", and unknown is why most of these are cut. "
+                           "reason=crossing-unconfirmed — we have not established there is a real, "
+                           "drivable crossing here; naming the road is not the same as confirming "
+                           "you can drive through it. "
+                           "reason=permission-unknown — the crossing IS real, but nobody has asked "
+                           "whether guests may use it, so the app does not assume they may. "
                            "reason=private-access — the Marriotts private crossings (S18/S20): "
-                           "real, but closed to guest through-routing at Solio's request. JW "
-                           "Marriott itself remains reachable. A crossing NOT listed here is not "
-                           "blocked by this decision layer — which is NOT the same as asserting "
-                           "its geometry is present and routable in the network. "
-                           "Generated from crossing_decisions.json."),
+                           "real, and closed to guest through-routing at Solio's request. JW "
+                           "Marriott itself remains reachable. "
+                           "The first two reopen the moment Solio answers; the third does not. "
+                           "A crossing NOT listed here is not blocked by this decision layer — "
+                           "which is NOT the same as asserting its geometry is present and "
+                           "routable in the network. Generated from crossing_decisions.json."),
            "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
            "features": xfeats}
     x_path = out_path.with_name(out_path.stem + "_crossings.geojson")

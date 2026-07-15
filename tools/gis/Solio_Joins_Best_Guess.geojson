@@ -113,16 +113,16 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S06",
-    "site_confirmed": true,
     "site_name": null,
-    "guest_routable": true,
+    "guest_routable": "unknown",
     "solio_said": [
      "S06 = Crossing"
     ],
     "decided": "2026-07-14",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "Crossing exists; whether guests may drive through it is UNKNOWN \u2014 nobody has asked. Cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; GPS points nearby but NO recorded drive crosses the river within 150 m \u2014 please confirm (downgraded from HIGH)",
-    "routable_basis": "inference"
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -181,14 +181,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S01",
-    "site_confirmed": true,
     "site_name": "near Tharua Bridge \u2014 separate crossing S of the drawn bridge",
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -247,14 +247,14 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S07",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "river crossing drawn on the map; GPS points nearby but NO recorded drive crosses the river within 150 m \u2014 please confirm (downgraded from HIGH)",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -344,14 +344,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S07",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -379,14 +379,14 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S07",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "river crossing drawn on the map; GPS points nearby but NO recorded drive crosses the river within 150 m \u2014 please confirm (downgraded from HIGH)",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -414,14 +414,14 @@
     "river_cross_events_150m": 3,
     "crossing_confirmed": true,
     "site": "S19",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (3 crossing events); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -449,14 +449,14 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S07",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "river crossing drawn on the map; GPS points nearby but NO recorded drive crosses the river within 150 m \u2014 please confirm (downgraded from HIGH)",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -515,14 +515,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S11",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -550,14 +550,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S09",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -678,14 +678,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S09",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -744,14 +744,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S12",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -996,14 +996,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S09",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1062,16 +1062,16 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S16",
-    "site_confirmed": false,
     "site_name": "Mount Kenya River Road (part)",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S16 = Part of the Mount Kenya River Road"
     ],
     "decided": "2026-07-14",
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; GPS points nearby but NO recorded drive crosses the river within 150 m \u2014 please confirm (downgraded from HIGH)",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -1099,14 +1099,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S15",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1134,14 +1134,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S09",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1169,14 +1169,14 @@
     "river_cross_events_150m": 2,
     "crossing_confirmed": true,
     "site": "S03",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (2 crossing events); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1235,14 +1235,14 @@
     "river_cross_events_150m": 2,
     "crossing_confirmed": true,
     "site": "S04",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (2 crossing events); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1301,14 +1301,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S02",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1367,14 +1367,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S12",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1402,14 +1402,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S12",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1437,14 +1437,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S14",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1472,14 +1472,14 @@
     "river_cross_events_150m": 3,
     "crossing_confirmed": true,
     "site": "S17",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (3 crossing events); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1538,14 +1538,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S13",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -1666,14 +1666,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S15",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -2135,9 +2135,8 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S05",
-    "site_confirmed": false,
     "site_name": "Kingfisher Dam",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -2146,9 +2145,10 @@
     ],
     "decided": "2026-07-14",
     "likely_endpoint": true,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2207,7 +2207,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -2217,7 +2216,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -2493,9 +2493,8 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S05",
-    "site_confirmed": false,
     "site_name": "Kingfisher Dam",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -2504,9 +2503,10 @@
     ],
     "decided": "2026-07-14",
     "likely_endpoint": true,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2534,16 +2534,16 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S21",
-    "site_confirmed": false,
     "site_name": "Orphanage Road",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S21 = Orphanage Road - Looks good"
     ],
     "decided": "2026-07-14",
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2571,7 +2571,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S18",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -2581,7 +2580,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -2609,7 +2609,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -2619,7 +2618,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -2647,7 +2647,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -2657,7 +2656,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -2685,14 +2685,14 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S22",
-    "site_confirmed": false,
     "site_name": null,
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": null,
     "decided": null,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2751,9 +2751,8 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S05",
-    "site_confirmed": false,
     "site_name": "Kingfisher Dam",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -2762,9 +2761,10 @@
     ],
     "decided": "2026-07-14",
     "likely_endpoint": true,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2792,9 +2792,8 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S05",
-    "site_confirmed": false,
     "site_name": "Kingfisher Dam",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -2803,9 +2802,10 @@
     ],
     "decided": "2026-07-14",
     "likely_endpoint": true,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2833,14 +2833,14 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S22",
-    "site_confirmed": false,
     "site_name": null,
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": null,
     "decided": null,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -2899,7 +2899,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -2909,7 +2908,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -2937,7 +2937,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -2947,7 +2946,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; no recorded drive crosses here \u2014 please confirm",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -3161,14 +3161,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S08",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map \u2014 upgraded from LOW on this evidence",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -3227,14 +3227,14 @@
     "river_cross_events_150m": 2,
     "crossing_confirmed": true,
     "site": "S03",
-    "site_confirmed": true,
     "site_name": null,
     "evidence_note": "recorded drives cross the river here (2 crossing events); crossing also drawn on the map \u2014 upgraded from LOW on this evidence",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -3758,7 +3758,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -3768,7 +3767,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -4447,7 +4447,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S18",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -4457,7 +4456,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -4485,7 +4485,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S18",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -4495,7 +4494,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -4802,7 +4802,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -4812,7 +4811,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -5398,7 +5398,6 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S20",
-    "site_confirmed": true,
     "site_name": "Marriotts Private Road",
     "guest_routable": false,
     "access": "private",
@@ -5408,7 +5407,8 @@
     "decided": "2026-07-14",
     "decision_note": "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -5560,14 +5560,14 @@
     "river_cross_events_150m": 1,
     "crossing_confirmed": true,
     "site": "S10",
-    "site_confirmed": true,
     "site_name": "Martins Bridge",
     "evidence_note": "recorded drives cross the river here (1 crossing event); crossing also drawn on the map \u2014 upgraded from LOW on this evidence",
     "guest_routable": true,
     "routable_basis": "recorded-drive",
     "solio_said": null,
     "decided": "2026-07-09",
-    "decision_note": "Crossing exists and guests may drive it. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field."
+    "decision_note": "Crossing exists and guests may drive it \u2014 a recorded drive crossed the river here. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "crossing_exists": true
    },
    "geometry": {
     "type": "LineString",
@@ -6060,14 +6060,14 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S22",
-    "site_confirmed": false,
     "site_name": null,
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": null,
     "decided": null,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
@@ -6219,9 +6219,8 @@
     "river_cross_events_150m": 0,
     "crossing_confirmed": false,
     "site": "S05",
-    "site_confirmed": false,
     "site_name": "Kingfisher Dam",
-    "guest_routable": false,
+    "guest_routable": "unknown",
     "solio_said": [
      "S05 = Dam",
      "Yeah - you can drive to a sort of view point/ pick nic spot",
@@ -6230,9 +6229,10 @@
     ],
     "decided": "2026-07-14",
     "likely_endpoint": true,
-    "decision_note": "NOT confirmed to exist as a drivable crossing \u2014 cut from routing. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decision_note": "NOT established as a drivable crossing \u2014 cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "longer join with no solid evidence either way \u2014 please check",
-    "routable_basis": null
+    "routable_basis": null,
+    "crossing_exists": "unknown"
    },
    "geometry": {
     "type": "LineString",
