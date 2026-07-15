@@ -363,33 +363,22 @@ def _segs_properly_intersect(p1, p2, p3, p4) -> bool:
 # used strict segment intersection while the importer used node-pairs + seam overlap, so
 # the test could not see the very cases the importer was built to handle (D87 F6, D89).
 #
-# Do not reimplement this predicate anywhere. Three forms, matching cut_blocked_edges:
-#   (a) node-pair — the edge's ends sit on the join's ends (vertex-snapped connectors)
-#   (b) seam      — the blocker lies ALONG part of this edge (its midpoint is on the road)
-#   (c) crossing  — the edge properly crosses the blocker (drives over it)
-BLOCK_TOL_M = 12.0
+# Do not reimplement this predicate anywhere. Two forms, matching cut_blocked_edges:
+#   (a) span     — the road runs the join: reaches both ends, covers it, doesn't wander
+#   (b) crossing — the road properly straddles the join (drives over it)
+#
+# There was a third, "seam: the blocker's MIDPOINT lies on the road". It is gone. Its history
+# is the whole argument for deleting it rather than keeping it as a safety net:
+#   D89: it was `line[len(line)//2]`, which for a 2-VERTEX line — nearly every join — returns
+#        the LAST vertex, so it asked "is the join's END near this road?", true of every road
+#        that merely stops at the river. Adjacency read as a seam, in the routine that CUTS.
+#   D90: rewritten to sample the join and require 90% coverage — at which point it became
+#        provably UNREACHABLE. It can only fire when both join ends are >40 m from the road
+#        while >=90% of the join is within 12 m of it, and the span form claims every such
+#        case first. A hooked join with 200 m hooks does not reach it.
+# A branch that cannot run, guarded by a tolerance no fixture pins, is not a safety net — it
+# is a place for a bug to live undisturbed, which is exactly what it did for two rounds.
 BLOCK_PAIR_TOL_M = 40.0
-
-
-def poly_midpoint(line):
-    """The TRUE midpoint of a polyline — interpolated at half its length.
-
-    Was `line[len(line) // 2]`, which for a 2-VERTEX line returns line[1]: the last
-    vertex, not the middle. Since almost every blocker join is a 2-point line, form (b)
-    was really asking "is the join's END near this road?" — true of every road that
-    merely STOPS at the join. Adjacency read as a seam, in the routine that CUTS (D89).
-    """
-    total = sum(dist_m(a, b) for a, b in zip(line, line[1:]))
-    if total == 0:
-        return line[0]
-    half, run = total / 2.0, 0.0
-    for a, b in zip(line, line[1:]):
-        d = dist_m(a, b)
-        if run + d >= half:
-            t = (half - run) / d if d else 0.0
-            return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
-        run += d
-    return line[-1]
 
 
 def poly_len(line) -> float:
@@ -420,34 +409,9 @@ DETOUR_SLACK_M = 40.0
 # an along-road span of 0.0 m. Adjacency misread as traversal — the same mistake as the D89
 # midpoint bug, in the fix for the D90 one. The road must cover the join, not just touch it.
 SPAN_MIN_FRAC = 0.5
-# A seam means the join lies ALONG the road for its whole length — so nearly every sample of
-# the join must sit on the road. Testing only the join's MIDPOINT let a road that merely ends
-# at the join's middle count as a seam and get cut.
-SEAM_COVER_FRAC = 0.9
-SEAM_SAMPLES = 24
 
 
-def _sample(line, n: int):
-    """n points spread evenly ALONG the polyline by length."""
-    total = poly_len(line)
-    if total == 0:
-        return [line[0]]
-    out, run, seg_i = [], 0.0, 0
-    segs = list(zip(line, line[1:]))
-    for k in range(n + 1):
-        want = total * k / n
-        while seg_i < len(segs) - 1 and run + dist_m(*segs[seg_i]) < want:
-            run += dist_m(*segs[seg_i])
-            seg_i += 1
-        a, b = segs[seg_i]
-        d = dist_m(a, b)
-        t = (want - run) / d if d else 0.0
-        t = max(0.0, min(1.0, t))
-        out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
-    return out
-
-
-def classify_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOCK_PAIR_TOL_M):
+def classify_blocker(pts, line, pair_tol: float = BLOCK_PAIR_TOL_M):
     """How this edge realises this blocked join, or None. THE single classifier.
 
     Both `cut_blocked_edges` (which cuts) and test_network_invariants.py (which proves none
@@ -457,7 +421,9 @@ def classify_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOC
     (D90 F3). There is one implementation and one set of constants.
 
     Returns (kind, lo_m, hi_m) where kind is:
-      "span"     the road runs the join — reaches both ends, directly. Cut that SPAN out.
+      "span"     the road runs the join — reaches both ends, covers it, does not wander.
+                 Cut that SPAN out (this is also the healed-seam case: a join lying along
+                 part of a long edge has both ends ON the edge and a span of ~its length).
       "crossing" the road strictly straddles the join. Cut the edge whole.
     A road merely touching, or ending at, the join is NEITHER: that is a road stopping at the
     river bank, which is exactly what an unbuilt crossing looks like.
@@ -470,20 +436,15 @@ def classify_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOC
         span = abs(s1 - s0)
         if blen * SPAN_MIN_FRAC <= span <= max(blen * DETOUR_FACTOR, blen + DETOUR_SLACK_M):
             return ("span", min(s0, s1), max(s0, s1))
-    # (b) seam — the join lies along the road for (nearly) its whole length
-    samples = _sample(line, SEAM_SAMPLES)
-    near = sum(1 for q in samples if nearest_on_poly(q, pts)[0] <= tol)
-    if near / len(samples) >= SEAM_COVER_FRAC:
-        return ("span", min(s0, s1), max(s0, s1))
-    # (c) strict transversal
+    # (b) strict transversal
     if any(_segs_properly_intersect(pts[i], pts[i + 1], line[j], line[j + 1])
            for i in range(len(pts) - 1) for j in range(len(line) - 1)):
         return ("crossing", None, None)
     return None
 
 
-def realises_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOCK_PAIR_TOL_M) -> bool:
-    return classify_blocker(pts, line, tol, pair_tol) is not None
+def realises_blocker(pts, line, pair_tol: float = BLOCK_PAIR_TOL_M) -> bool:
+    return classify_blocker(pts, line, pair_tol) is not None
 
 
 def cut_blocked_edges(
