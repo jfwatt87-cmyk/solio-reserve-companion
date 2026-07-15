@@ -1,7 +1,7 @@
 {
  "type": "FeatureCollection",
  "name": "Solio_Blocked_Crossings_V2",
- "description": "River crossings the app will NOT route over, and why. reason=unconfirmed \u2014 Solio has not confirmed the crossing is real and guest-drivable; naming the road is not the same as confirming you can drive through it, so these stay cut and may yet reopen if confirmed. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, but closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. Crossings NOT listed here are routable. Generated from crossing_decisions.json.",
+ "description": "River crossings the app will NOT route over, and why. reason=unconfirmed \u2014 Solio has not confirmed the crossing is real and guest-drivable; naming the road is not the same as confirming you can drive through it, so these stay cut and may yet reopen if confirmed. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, but closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. A crossing NOT listed here is not blocked by this decision layer \u2014 which is NOT the same as asserting its geometry is present and routable in the network. Generated from crossing_decisions.json.",
  "crs": {
   "type": "name",
   "properties": {

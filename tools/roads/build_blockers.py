@@ -104,27 +104,34 @@ def build() -> dict[Path, dict]:
 # Decision fields on the joins file — generated, never hand-set. These are the exact
 # fields that contradicted each other on 14 Jul (D87 F7): a site advertised
 # guest_routable=true while the manifest had it cut.
-DECISION_FIELDS = ("site_confirmed", "guest_routable", "site_name", "access", "solio_said",
-                   "decided", "decision_note", "likely_endpoint")
+DECISION_FIELDS = ("site_confirmed", "guest_routable", "routable_basis", "site_name", "access",
+                   "solio_said", "decided", "decision_note", "likely_endpoint")
 # Written by hand on 14 Jul, now stale or retracted. `route_cost_of_blocking` carried the
 # claim "zero — opening S05 changes no POI route", which D87 F2 RETRACTED as unproven.
 STALE_FIELDS = ("access_decision", "access_decision_status", "crossing_verdict",
                 "route_cost_of_blocking", "ask_status", "callan_reply", "confirmed_by",
                 "agreed_by", "note")
+# NEVER TOUCHED. `evidence_note` and the GPX fields record what the recorded drives showed;
+# they are findings, not decisions, and nothing generated may overwrite them. On 15 Jul I put
+# `note` in STALE_FIELDS and destroyed the evidence text on all 22 managed joins — while the
+# docstring below said evidence "is not ours to rewrite" (D89). Restored from f271601 under a
+# name whose whole job is to stop that happening again.
+EVIDENCE_FIELDS = ("evidence_note", "confidence", "crossing_confirmed", "gpx_points_near",
+                   "gpx_crossings", "river_cross_events_150m", "on_river", "gap_m", "kind")
 
 
-def sync_joins(man: dict) -> int:
+def canonical_joins(man: dict) -> dict:
     """Regenerate the joins file's DECISION fields from the manifest.
 
-    Evidence fields (`confidence`, `crossing_confirmed`, `gpx_*`, `on_river`) are left
-    alone: they record what the recorded drives showed and are not ours to rewrite.
-    A site can legitimately be confirmed by Solio while crossing_confirmed=false —
-    that is S06 — so the two are not in conflict; the decision_note says which is which.
+    EVIDENCE_FIELDS are left strictly alone: they record what the recorded drives showed
+    and are findings, not decisions. A site can legitimately be confirmed by Solio while
+    crossing_confirmed=false — that is S06, confirmed by his words rather than by a drive —
+    so the two are not in conflict, and decision_note says which is which.
     """
+    assert not (set(STALE_FIELDS) & set(EVIDENCE_FIELDS)), \
+        "a field cannot be both stale and evidence — that is how the notes were destroyed"
     sites = man["sites"]
-    path = JOINS
-    d = json.loads(path.read_text())
-    n = 0
+    d = json.loads(JOINS.read_text())
     for f in d["features"]:
         sid = f["properties"].get("site")
         if sid not in sites:
@@ -133,9 +140,13 @@ def sync_joins(man: dict) -> int:
         for k in STALE_FIELDS:
             pr.pop(k, None)
         s = sites[sid]
+        # TWO AXES (D89). Deriving both from `status == "confirmed"` put site_confirmed:false
+        # next to "Real crossing..." on S18/S20 — a real crossing guests may not use.
+        exists = s["status"] in ("confirmed", "private")
         confirmed = s["status"] == "confirmed"
-        pr["site_confirmed"] = confirmed
-        pr["guest_routable"] = confirmed
+        pr["site_confirmed"] = exists          # is there a crossing here?
+        pr["guest_routable"] = confirmed       # may a guest drive through it?
+        pr["routable_basis"] = s.get("routable_basis") or ("quote" if confirmed else None)
         pr["site_name"] = s.get("name")
         pr["solio_said"] = s.get("quote") or None
         pr["decided"] = s.get("date")
@@ -145,19 +156,26 @@ def sync_joins(man: dict) -> int:
             pr.pop("access", None)
         if s.get("likely_endpoint"):
             pr["likely_endpoint"] = True
+        else:
+            pr.pop("likely_endpoint", None)   # must clear if the manifest flag goes away
         pr["decision_note"] = (
-            ("Confirmed by Solio as drivable." if confirmed else
-             "NOT confirmed drivable — cut from routing." if s["status"] == "unconfirmed" else
-             "Real crossing, closed to guest through-routing by agreement.")
+            ("Crossing exists and guests may drive it." if confirmed else
+             "NOT confirmed to exist as a drivable crossing — cut from routing."
+             if s["status"] == "unconfirmed" else
+             "Crossing EXISTS and is confirmed; closed to guest through-routing by agreement.")
             + " Decision authored in crossing_decisions.json — do not hand-edit this field.")
-        n += 1
-    path.write_text(json.dumps(d, indent=1) + "\n")
-    return n
+    return d
 
 
 def main() -> None:
     check = "--check" in sys.argv
+    man = load_manifest()
     built = build()
+    # --check must cover EVERYTHING this script owns, not just the files it is named
+    # after. It used to verify the two blocker files only and silently ignore the joins
+    # sync — so removing a site from the manifest, editing a joins field, or corrupting
+    # join geometry all passed green (D89). Canonicalise and compare the lot.
+    built[JOINS] = canonical_joins(man)
     drift = False
     for path, fc in built.items():
         text = json.dumps(fc, indent=1) + "\n"
@@ -170,15 +188,14 @@ def main() -> None:
             path.write_text(text)
             by_site: dict[str, int] = {}
             for f in fc["features"]:
-                by_site[f["properties"]["site"]] = by_site.get(f["properties"]["site"], 0) + 1
-            print(f"wrote {path.name}: {len(fc['features'])} joins {by_site or '{}'}")
-    if not check:
-        n = sync_joins(load_manifest())
-        print(f"synced {n} join decision fields in {JOINS.name}")
+                sid = f["properties"].get("site")
+                if sid:
+                    by_site[sid] = by_site.get(sid, 0) + 1
+            print(f"wrote {path.name}: {len(fc['features'])} features {by_site or '{}'}")
     if check and drift:
         sys.exit(1)
     if check:
-        print("blocker files match crossing_decisions.json")
+        print("blockers AND joins match crossing_decisions.json")
 
 
 if __name__ == "__main__":
