@@ -1,0 +1,610 @@
+{
+ "type": "FeatureCollection",
+ "name": "Solio_Blocked_Crossings_V2",
+ "description": "River crossings the app will NOT route over, and why. reason=unconfirmed \u2014 Solio has not confirmed the crossing is real and guest-drivable; naming the road is not the same as confirming you can drive through it, so these stay cut and may yet reopen if confirmed. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, but closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. Crossings NOT listed here are routable. Generated from crossing_decisions.json.",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.923047,
+      -0.197593
+     ],
+     [
+      36.923128,
+      -0.197417
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S16",
+    "site_name": "Mount Kenya River Road (part)",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 21.5,
+    "solio_said": [
+     "S16 = Part of the Mount Kenya River Road"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.910093,
+      -0.155046
+     ],
+     [
+      36.90987,
+      -0.154996
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 25.5,
+    "solio_said": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.910115,
+      -0.15517
+     ],
+     [
+      36.910072,
+      -0.155288
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 14.0,
+    "solio_said": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898304,
+      -0.243575
+     ],
+     [
+      36.898317,
+      -0.243424
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S21",
+    "site_name": "Orphanage Road",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 16.9,
+    "solio_said": [
+     "S21 = Orphanage Road - Looks good"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.888202,
+      -0.250048
+     ],
+     [
+      36.88831,
+      -0.249935
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S22",
+    "site_name": null,
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 17.3,
+    "solio_said": null,
+    "decided": null
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.909726,
+      -0.155898
+     ],
+     [
+      36.909801,
+      -0.155783
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 15.3,
+    "solio_said": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.909656,
+      -0.155953
+     ],
+     [
+      36.909584,
+      -0.156039
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 12.5,
+    "solio_said": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.887823,
+      -0.25029
+     ],
+     [
+      36.887756,
+      -0.250314
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S22",
+    "site_name": null,
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 8.0,
+    "solio_said": null,
+    "decided": null
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.887721,
+      -0.250342
+     ],
+     [
+      36.888123,
+      -0.25059
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S22",
+    "site_name": null,
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 52.6,
+    "solio_said": null,
+    "decided": null
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.909872,
+      -0.154966
+     ],
+     [
+      36.909871,
+      -0.155728
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S05",
+    "site_name": "Kingfisher Dam",
+    "status": "unconfirmed",
+    "reason": "unconfirmed",
+    "routed_by_app": false,
+    "gap_m": 84.9,
+    "solio_said": [
+     "S05 = Dam",
+     "Yeah - you can drive to a sort of view point/ pick nic spot",
+     "I'd say the road is pretty accurate on the map",
+     "I believe it's an end point"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.897536,
+      -0.203856
+     ],
+     [
+      36.89756,
+      -0.203583
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 30.4,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.892313,
+      -0.202914
+     ],
+     [
+      36.892369,
+      -0.202644
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S18",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 30.7,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898627,
+      -0.204042
+     ],
+     [
+      36.898521,
+      -0.203758
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 33.7,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.900252,
+      -0.203695
+     ],
+     [
+      36.900295,
+      -0.203577
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 14.0,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.899402,
+      -0.203743
+     ],
+     [
+      36.89913,
+      -0.203872
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 33.5,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898524,
+      -0.203728
+     ],
+     [
+      36.898553,
+      -0.203395
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 37.2,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.899081,
+      -0.203319
+     ],
+     [
+      36.898556,
+      -0.203365
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 58.6,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.891601,
+      -0.203249
+     ],
+     [
+      36.892314,
+      -0.20328
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S18",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 79.5,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.891598,
+      -0.203279
+     ],
+     [
+      36.892273,
+      -0.203002
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S18",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 81.2,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.900177,
+      -0.204177
+     ],
+     [
+      36.900282,
+      -0.203728
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 51.3,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.898624,
+      -0.204072
+     ],
+     [
+      36.899098,
+      -0.20387
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S20",
+    "site_name": "Marriotts Private Road",
+    "status": "private",
+    "reason": "private-access",
+    "routed_by_app": false,
+    "gap_m": 57.3,
+    "solio_said": [
+     "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+    ],
+    "decided": "2026-07-14"
+   }
+  }
+ ]
+}
