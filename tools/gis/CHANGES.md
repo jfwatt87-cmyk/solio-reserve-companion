@@ -191,9 +191,12 @@ view point/pick nic spot"* and *"I'd say the road is pretty accurate on the map"
 
 - **"drive TO", not "drive ACROSS"** — a destination, not a through-route. The leading "Yeah"
   is the trap: banked as a yes, it would have routed guests over a dam wall.
-- **Measured, independently of the wording:** opening S05 changes **zero POI routes**, keeps
-  nodes/edges identical (355/446) and leaves the structure within 400 m of the dam unchanged
-  (same single dead-end spur `g226`). The crossing is not load-bearing — **blocking it is free**.
+- ~~**Measured, independently of the wording:** opening S05 changes **zero POI routes** … the
+  crossing is not load-bearing — **blocking it is free**.~~
+  **RETRACTED 2026-07-15 (D87 F2) — this claim was never established.** The experiment's extra
+  node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a
+  plausible real connection moves 8/36 pairs (gate→Kingfisher 16.18→14.65 km). S05 stays cut on
+  Callan's words, NOT on a cost argument. Do not repeat the claim.
 - S05 sits 314 m from the **Kingfisher Dam** POI, which already routes fine (gate→16.18 km).
   Guests can already reach the dam; only the river hop is cut.
 - **Stays in `blockers.unconfirmed-crossings.geojson`, NOT moved to private-access.** The

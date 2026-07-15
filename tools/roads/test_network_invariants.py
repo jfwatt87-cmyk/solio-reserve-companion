@@ -121,41 +121,15 @@ def main() -> None:
     #      actually committed, so a stale or hand-edited roads.gis.ts passed.
     import json
 
-    from export_v2_geojson import seg_point_m  # point-to-SEGMENT; shared, so it cannot drift
-
-    BLOCK_M = 15.0
-
-    def _near(pt, pts) -> bool:
-        """Distance from a point to the POLYLINE — not to its vertices. Vertex-only
-        distance misses a long simplified edge that passes straight through with no
-        vertex there, which is exactly how a leak would hide."""
-        return min(seg_point_m(pt, pts[k], pts[k + 1]) for k in range(len(pts) - 1)) < BLOCK_M
-
-    def _crosses_properly(p1, p2, p3, p4) -> bool:
-        """Transversal intersection ONLY — no endpoint-touch, no collinear degeneracy.
-        Plain `segs_cross` returns True when an edge merely ENDS on the join, which
-        every road that legitimately stops at the river does (`jw`'s own approach)."""
-        def o(a, b, c):
-            v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
-            return 0 if abs(v) < 1e-18 else (1 if v > 0 else -1)
-        o1, o2, o3, o4 = o(p1, p2, p3), o(p1, p2, p4), o(p3, p4, p1), o(p3, p4, p2)
-        if 0 in (o1, o2, o3, o4):
-            return False
-        return o1 != o2 and o3 != o4
+    # THE predicate — imported from the importer, not reimplemented. Reimplementing it is
+    # how this went wrong three times: every version of mine passed live data while
+    # misclassifying fixtures (vertex-only distance missed a long edge passing through;
+    # endpoint-touch scored as a crossing; "reaches both ends" flagged a U-shaped road that
+    # goes the long way round). The test must ask the same question the importer answered.
+    from import_gis_roads import realises_blocker
 
     def traverses(pts, cs) -> bool:
-        """Does this edge REALISE the blocked join — get you from one side to the other?
-
-        A join line spans the gap between two road ends A and B. An edge realises it if
-        it reaches BOTH ends (the node-pair connector and healed-seam cases — invisible
-        to strict intersection, D87 F6), or crosses the line transversally (driving over
-        the river). Merely touching one end is ADJACENCY: expected, correct, not a leak.
-        Every road that stops at the water does it.
-        """
-        if _near(cs[0], pts) and _near(cs[-1], pts):
-            return True
-        return any(_crosses_properly(pts[k], pts[k + 1], cs[i], cs[i + 1])
-                   for k in range(len(pts) - 1) for i in range(len(cs) - 1))
+        return realises_blocker(pts, cs)
 
     def blocker_leaks(fname: str, reason: str | None = None) -> int:
         n = 0

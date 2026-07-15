@@ -155,8 +155,10 @@ def main() -> None:
                            "drive through it, so these stay cut and may yet reopen if confirmed. "
                            "reason=private-access — the Marriotts private crossings (S18/S20): "
                            "real, but closed to guest through-routing at Solio's request. JW "
-                           "Marriott itself remains reachable. Crossings NOT listed here are "
-                           "routable. Generated from crossing_decisions.json."),
+                           "Marriott itself remains reachable. A crossing NOT listed here is not "
+                           "blocked by this decision layer — which is NOT the same as asserting "
+                           "its geometry is present and routable in the network. "
+                           "Generated from crossing_decisions.json."),
            "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
            "features": xfeats}
     x_path = out_path.with_name(out_path.stem + "_crossings.geojson")

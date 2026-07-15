@@ -305,6 +305,60 @@ def _segs_properly_intersect(p1, p2, p3, p4) -> bool:
     return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
 
 
+# The ONE definition of "this edge realises a blocked join". Both the importer (which
+# cuts) and test_network_invariants.py (which proves none survived) call this — so the
+# safety oracle and the implementation oracle cannot disagree. They did before: the test
+# used strict segment intersection while the importer used node-pairs + seam overlap, so
+# the test could not see the very cases the importer was built to handle (D87 F6, D89).
+#
+# Do not reimplement this predicate anywhere. Three forms, matching cut_blocked_edges:
+#   (a) node-pair — the edge's ends sit on the join's ends (vertex-snapped connectors)
+#   (b) seam      — the blocker lies ALONG part of this edge (its midpoint is on the road)
+#   (c) crossing  — the edge properly crosses the blocker (drives over it)
+BLOCK_TOL_M = 12.0
+BLOCK_PAIR_TOL_M = 40.0
+
+
+def poly_midpoint(line):
+    """The TRUE midpoint of a polyline — interpolated at half its length.
+
+    Was `line[len(line) // 2]`, which for a 2-VERTEX line returns line[1]: the last
+    vertex, not the middle. Since almost every blocker join is a 2-point line, form (b)
+    was really asking "is the join's END near this road?" — true of every road that
+    merely STOPS at the join. Adjacency read as a seam, in the routine that CUTS (D89).
+    """
+    total = sum(dist_m(a, b) for a, b in zip(line, line[1:]))
+    if total == 0:
+        return line[0]
+    half, run = total / 2.0, 0.0
+    for a, b in zip(line, line[1:]):
+        d = dist_m(a, b)
+        if run + d >= half:
+            t = (half - run) / d if d else 0.0
+            return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+        run += d
+    return line[-1]
+
+
+def realises_blocker(pts, line, tol: float = BLOCK_TOL_M, pair_tol: float = BLOCK_PAIR_TOL_M) -> bool:
+    def dist_to_poly(q, poly):
+        return min(project_to_segment(q, a, b)[2] for a, b in zip(poly, poly[1:]))
+
+    # (a) the edge spans the join end-to-end
+    a0, a1, b0, b1 = pts[0], pts[-1], line[0], line[-1]
+    if ((dist_m(a0, b0) <= pair_tol and dist_m(a1, b1) <= pair_tol)
+            or (dist_m(a0, b1) <= pair_tol and dist_m(a1, b0) <= pair_tol)):
+        return True
+    # (b) the blocker lies along this edge — midpoint on the road, not merely an end
+    #     near it. This is what makes mere ADJACENCY (a road stopping at the river)
+    #     not a leak, without needing a special case for it.
+    if dist_to_poly(poly_midpoint(line), pts) <= tol:
+        return True
+    # (c) transversal crossing
+    return any(_segs_properly_intersect(pts[i], pts[i + 1], line[j], line[j + 1])
+               for i in range(len(pts) - 1) for j in range(len(line) - 1))
+
+
 def cut_blocked_edges(
     nodes: list[tuple[float, float]], edges: list[dict],
     blockers: list[list[tuple[float, float]]],
@@ -331,7 +385,7 @@ def cut_blocked_edges(
         return bi, bd
 
     def poly_mid(pts):
-        return pts[len(pts) // 2]
+        return poly_midpoint(pts)   # TRUE midpoint — see poly_midpoint (D89)
 
     def nearest_vertex_idx(pts, p):
         return min(range(len(pts)), key=lambda i: dist_m(pts[i], p))
