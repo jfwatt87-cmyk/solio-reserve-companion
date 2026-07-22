@@ -55,6 +55,13 @@ export const SHOW_BOUNDARY = false;
 // Parked deliberately at James's call (2026-07-14): it is a nav-time question, not a
 // roads-data one. Closing the drive outright needs Callan to identify which roads ARE
 // the drive — we have geometry for two crossings on it, not for the road itself.
+//
+// ALSO BEFORE FLIPPING THIS ON — GPS-accuracy gating (D105–D108, 2026-07-22). The
+// popup drive distance learned the hard way that a poor fix beside close roads can
+// snap to the wrong edge and understate a drive by kilometres. The popup now gates on
+// accuracy ≤50 m and edge ambiguity; nav's OWN route consumers (nearestNode start
+// snapping, off-route re-routing) predate that work and need the equivalent gating
+// before any guest is guided by them (gpt-5.6-sol round 4).
 export const NAV_ENABLED = false;
 
 /**
