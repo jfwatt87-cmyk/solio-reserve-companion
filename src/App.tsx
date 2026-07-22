@@ -557,7 +557,13 @@ export default function App() {
     const id = navigator.geolocation.watchPosition(
       (p) => {
         setGpsError(null);
-        setAccuracy(typeof p.coords.accuracy === "number" ? p.coords.accuracy : null);
+        // Number.isFinite, not typeof: NaN is typeof "number" but would fail
+        // OPEN through the accuracy gate (NaN > 50 and NaN == null are both
+        // false). Malformed/emulated providers → null → gate fails closed
+        // (gpt-5.6-sol round 4). Negative accuracy is equally malformed.
+        setAccuracy(
+          Number.isFinite(p.coords.accuracy) && p.coords.accuracy >= 0 ? p.coords.accuracy : null,
+        );
         setUser({ lat: p.coords.latitude, lng: p.coords.longitude });
         if (p.coords.heading != null && !Number.isNaN(p.coords.heading)) {
           setHeading(p.coords.heading);
@@ -626,7 +632,10 @@ export default function App() {
       // reserve and understate a 4.6 km drive as 40 m. Real GPS with poor or
       // unknown accuracy gets the labelled direct readout, nothing routed.
       // (Sim positions are exact by construction — no accuracy to enforce.)
-      if (source === "gps" && (accuracy == null || accuracy > GOOD_FIX_M)) return null;
+      // Phrased as "not proven good" rather than "proven bad" so NaN — or any
+      // other non-comparable value that slips past the setter — fails CLOSED
+      // (gpt-5.6-sol round 4: both `NaN == null` and `NaN > 50` are false).
+      if (source === "gps" && !(accuracy != null && accuracy <= GOOD_FIX_M)) return null;
       const SNAP_AMBIGUITY_M = 75; // GPS error envelope (good fix ≤50 m) + projection slop
       const DRIVE_AGREE_M = 500; // candidates further apart than this = ambiguous
       const candidates = network.nearestRoadPoints(user, SNAP_AMBIGUITY_M);
