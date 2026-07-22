@@ -620,6 +620,13 @@ export default function App() {
       // kilometres short. When they agree, show the LONGEST: within the
       // tolerance band, over-stating is the safe direction ("approx" is the
       // label), under-stating is the field-safety defect.
+      // The ambiguity band below is calibrated for fixes with ≤GOOD_FIX_M
+      // error — so ENFORCE that model (gpt-5.6-sol round 3): a 100 m fix can
+      // put every plausible-looking candidate on the wrong side of the
+      // reserve and understate a 4.6 km drive as 40 m. Real GPS with poor or
+      // unknown accuracy gets the labelled direct readout, nothing routed.
+      // (Sim positions are exact by construction — no accuracy to enforce.)
+      if (source === "gps" && (accuracy == null || accuracy > GOOD_FIX_M)) return null;
       const SNAP_AMBIGUITY_M = 75; // GPS error envelope (good fix ≤50 m) + projection slop
       const DRIVE_AGREE_M = 500; // candidates further apart than this = ambiguous
       const candidates = network.nearestRoadPoints(user, SNAP_AMBIGUITY_M);
@@ -656,11 +663,19 @@ export default function App() {
         maxTotal = Math.max(maxTotal, bestForEdge);
       }
       if (maxTotal - minTotal > DRIVE_AGREE_M) return null;
-      return maxTotal;
+      // Within the agreement band any candidate is ≤DRIVE_AGREE_M from the
+      // truth, so the SAFETY bound is identical whichever we show. Long
+      // drives show the LONGEST (overstating is the safe direction); short
+      // drives show the SHORTEST — at walking distance the max reads absurd
+      // ("550 m" while parked AT the lodge, gpt-5.6-sol round 3) and the
+      // residual error is bounded by the band the guest can already see
+      // across.
+      const SHORT_DRIVE_M = 600;
+      return maxTotal <= SHORT_DRIVE_M ? minTotal : maxTotal;
     } catch {
       return null;
     }
-  }, [openPoi, user, network]);
+  }, [openPoi, user, network, source, accuracy]);
 
   // In full-screen map mode the place popup and the toast both sit at the bottom
   // of the screen, so a toast would land on top of the popup's buttons. Measure
