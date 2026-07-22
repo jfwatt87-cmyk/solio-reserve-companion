@@ -1,20 +1,20 @@
 {
   "corners": {
     "tl": [
-      36.8669465,
-      -0.0892246
+      36.8669573,
+      -0.0891009
     ],
     "tr": [
-      37.0026852,
-      -0.1010203
+      37.0026744,
+      -0.1011441
     ],
     "br": [
-      36.9848002,
-      -0.3060862
+      36.9847894,
+      -0.30621
     ],
     "bl": [
-      36.8490616,
-      -0.2942907
+      36.8490724,
+      -0.2941669
     ]
   },
   "bearing": 4.984,
@@ -22,14 +22,14 @@
     0.2759956596586082,
     -0.024070994166535388,
     -1132927.9521983557,
-    -0.025592883133564094,
-    -0.29450892625546676,
-    102108.24779531544
+    -0.026129982989099212,
+    -0.2944620830279123,
+    104317.06375444341
   ],
   "px": [
     4202,
     6774
   ],
   "note": "Poster is pinned AXIS-ALIGNED in the app (always square). Real lng/lat are projected to EPSG:3857 then to pixel via `merc2px`, then to the display box, so overlays stay on-feature. `bearing` orients the compass/heading.",
-  "source": "SOLIO_MAP_FINAL_straightened_georef_compass_true_north.tif"
+  "source": "SOLIO MAP REVISED JULY 26.jpg (Jen Carr-Hartley revision), single warp from the original into the previous truenorth frame + vertical un-shear +0.1115 deg (frame tilt was +0.11 deg, over the 0.05 threshold); shear composed exactly into merc2px/corners/bearing so GPS is unchanged. SIFT fit vs previous frame: 1929 inliers, median 0.92 px, p90 1.76 px, uniform across quadrants."
 }
