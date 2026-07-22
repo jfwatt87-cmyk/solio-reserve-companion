@@ -129,10 +129,45 @@ export function compass(bearing: number): string {
   return COMPASS[Math.round(bearing / 22.5) % 16];
 }
 
-/** Human-friendly distance string. */
+/** Human-friendly distance string. Unit switch at 1 km and precision switch at
+ *  10 km sit exactly on the rounding boundaries, so a 1 m GPS change can never
+ *  jump the display (949→"950 m" / 950→"0.9 km" was a reversal; 9499→"9.5 km" /
+ *  9500→"10 km" was a 0.5 km leap). */
 export function formatDistance(meters: number): string {
-  if (meters < 950) return `${Math.round(meters / 10) * 10} m`;
-  return `${(meters / 1000).toFixed(meters < 9500 ? 1 : 0)} km`;
+  if (meters < 995) return `${Math.round(meters / 10) * 10} m`;
+  return `${(meters / 1000).toFixed(meters < 9950 ? 1 : 0)} km`;
+}
+
+/** Minimum distance in metres between two short segments a1–a2 and b1–b2.
+ *  Local equirectangular projection — exact enough at reserve scale (<25 km). */
+export function segmentsMinMeters(a1: LatLng, a2: LatLng, b1: LatLng, b2: LatLng): number {
+  const lat0 = toRad((a1.lat + a2.lat + b1.lat + b2.lat) / 4);
+  const mx = Math.cos(lat0) * 111320;
+  const my = 110574;
+  const P = (p: LatLng): [number, number] => [p.lng * mx, p.lat * my];
+  const [ax1, ay1] = P(a1), [ax2, ay2] = P(a2), [bx1, by1] = P(b1), [bx2, by2] = P(b2);
+  const d2 = (x1: number, y1: number, x2: number, y2: number) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
+  const ptSeg = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
+    const l2 = d2(x1, y1, x2, y2);
+    if (l2 === 0) return d2(px, py, x1, y1);
+    const t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2));
+    return d2(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+  };
+  const orient = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) =>
+    Math.sign((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1));
+  const o1 = orient(ax1, ay1, ax2, ay2, bx1, by1);
+  const o2 = orient(ax1, ay1, ax2, ay2, bx2, by2);
+  const o3 = orient(bx1, by1, bx2, by2, ax1, ay1);
+  const o4 = orient(bx1, by1, bx2, by2, ax2, ay2);
+  if (o1 !== o2 && o3 !== o4) return 0; // proper intersection
+  return Math.sqrt(
+    Math.min(
+      ptSeg(bx1, by1, ax1, ay1, ax2, ay2),
+      ptSeg(bx2, by2, ax1, ay1, ax2, ay2),
+      ptSeg(ax1, ay1, bx1, by1, bx2, by2),
+      ptSeg(ax2, ay2, bx1, by1, bx2, by2),
+    ),
+  );
 }
 
 /** "3 minutes ago" style relative time from an epoch (ms). */
