@@ -66,6 +66,7 @@ export default function App() {
       alternatives: (...args: Parameters<Net["alternatives"]>) => get().alternatives(...args),
       nearestNode: (...args: Parameters<Net["nearestNode"]>) => get().nearestNode(...args),
       nearestRoadPoint: (...args: Parameters<Net["nearestRoadPoint"]>) => get().nearestRoadPoint(...args),
+      nearestRoadPoints: (...args: Parameters<Net["nearestRoadPoints"]>) => get().nearestRoadPoints(...args),
     };
   }, []);
 
@@ -605,33 +606,57 @@ export default function App() {
       // Node-snapping understated real drives by kilometres when the guest sat
       // mid-edge on a long road but straight-line-nearer to some other road's
       // junction (post-release audit 2026-07-22: 2.3 km shown vs 9.1 km real
-      // at the g190–g147 midpoint). The drive is then routed from BOTH ends of
-      // the occupied edge, each plus its along-the-road distance — the shorter
-      // total is what the guest would actually drive.
-      const snap = network.nearestRoadPoint(user);
-      if (!snap || snap.gapM > 2000) return null;
-      // The user->road connector is a straight line the road graph never
-      // vetted: a guest beside a cut crossing — private (S18/S20) or
-      // permission-unknown (S05/S06/S16/S21/S22) — can snap to the FAR side,
-      // and the "drive distance" would then assume a crossing the graph
-      // forbids and understate (gpt-5.6-sol R8+R9). If the connector passes
-      // near ANY cut segment, show the direct readout instead.
-      if (BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, snap.point, s[0], s[1]) < 25)) {
-        return null;
+      // at the g190–g147 midpoint).
+      //
+      // AND the nearest edge is only a guess: with ordinary GPS error the fix
+      // can land nearer a parallel road than the one the guest is driving
+      // (re-review 2026-07-22: a 30 m error — inside our own 50 m good-fix
+      // threshold — picked the wrong edge and understated a drive by 6.4 km).
+      // So consider EVERY edge within SNAP_AMBIGUITY_M of the nearest as
+      // plausibly occupied; each candidate's drive is routed from both of its
+      // endpoints plus the along-edge distance. If the candidates disagree by
+      // more than DRIVE_AGREE_M we genuinely don't know which road the guest
+      // is on — show the direct readout rather than a number that could be
+      // kilometres short. When they agree, show the LONGEST: within the
+      // tolerance band, over-stating is the safe direction ("approx" is the
+      // label), under-stating is the field-safety defect.
+      const SNAP_AMBIGUITY_M = 75; // GPS error envelope (good fix ≤50 m) + projection slop
+      const DRIVE_AGREE_M = 500; // candidates further apart than this = ambiguous
+      const candidates = network.nearestRoadPoints(user, SNAP_AMBIGUITY_M);
+      if (candidates.length === 0 || candidates[0].gapM > 2000) return null;
+      let minTotal = Infinity;
+      let maxTotal = -Infinity;
+      for (const snap of candidates) {
+        // The user->road connector is a straight line the road graph never
+        // vetted: a guest beside a cut crossing — private (S18/S20) or
+        // permission-unknown (S05/S06/S16/S21/S22) — can snap to the FAR
+        // side, and the "drive distance" would then assume a crossing the
+        // graph forbids and understate (gpt-5.6-sol R8+R9). If ANY plausible
+        // candidate's connector passes near a cut segment, the safe answer
+        // is the direct readout.
+        if (BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, snap.point, s[0], s[1]) < 25)) {
+          return null;
+        }
+        let bestForEdge: number | null = null;
+        for (const [endId, alongM] of [
+          [snap.aId, snap.alongToAM],
+          [snap.bId, snap.alongToBM],
+        ] as const) {
+          const r = network.route(endId, openPoi.nodeId);
+          if (!r) continue; // endpoint unreachable — try the other one
+          // r.totalM is 0 when the POI IS this endpoint: the along-edge
+          // distance already covers the drive, so an empty path is fine.
+          const total = snap.gapM + alongM + r.totalM;
+          if (bestForEdge === null || total < bestForEdge) bestForEdge = total;
+        }
+        // A plausible edge with NO route to the POI means we cannot bound the
+        // real drive — fail safe to the direct readout.
+        if (bestForEdge === null) return null;
+        minTotal = Math.min(minTotal, bestForEdge);
+        maxTotal = Math.max(maxTotal, bestForEdge);
       }
-      let best: number | null = null;
-      for (const [endId, alongM] of [
-        [snap.aId, snap.alongToAM],
-        [snap.bId, snap.alongToBM],
-      ] as const) {
-        const r = network.route(endId, openPoi.nodeId);
-        if (!r) continue; // disconnected component — try the other endpoint
-        // r.totalM is 0 when the POI IS this endpoint: the along-edge distance
-        // already covers the drive, so an empty route path is fine here.
-        const total = snap.gapM + alongM + r.totalM;
-        if (best === null || total < best) best = total;
-      }
-      return best;
+      if (maxTotal - minTotal > DRIVE_AGREE_M) return null;
+      return maxTotal;
     } catch {
       return null;
     }
