@@ -4,10 +4,12 @@ import coverLogo from "./assets/solio-logo.png";
 import { createGeoReference, pixelWorld, MAP_MARGIN, NAV_ENABLED } from "./data/reserve";
 import { insideReserveBuffered } from "./data/boundary";
 import { createRoadNetwork, NODE_PIXEL } from "./data/roadSource";
+import { BLOCKER_SEGMENTS } from "./data/blockers";
 import { POIS, poiWorld, type Poi } from "./data/pois";
 import { TOURS, type Tour } from "./data/tours";
 import {
   distanceMeters,
+  segmentsMinMeters,
   destinationPoint,
   pointToPathMeters,
   projectOnPath,
@@ -570,6 +572,38 @@ export default function App() {
   // dismisses it or a new crossing replaces it — no auto-timeout.
 
   const openPoi = openPoiId ? POIS.find((p) => p.id === openPoiId) ?? null : null;
+
+  // Approximate drive distance for the open popup — a read-only A* query over
+  // the same road graph navigation uses, with nav itself still OFF
+  // (NAV_ENABLED gates all guidance UI; this shows a number, it never routes a
+  // guest anywhere). "Approx" is load-bearing: the graph still carries cut
+  // river crossings awaiting Callan's GIS (D91/D92), so some pairs read up to
+  // ~1.6 km long — overstated, never understated. Computed only while a popup
+  // is open: the first call pays the lazy graph build (user-initiated, one
+  // time), and startup stays as cheap as before. Off/far from the road
+  // network (>2 km to the nearest node) falls back to the direct readout.
+  const openPoiDriveM = useMemo(() => {
+    if (!openPoi || !user) return null;
+    try {
+      const start = network.nearestNode(user);
+      const gap = distanceMeters(user, start);
+      if (gap > 2000) return null;
+      // The user->start connector is a straight line the road graph never
+      // vetted: a guest beside a cut crossing — private (S18/S20) or
+      // permission-unknown (S05/S06/S16/S21/S22) — can snap to a node on the
+      // FAR side, and the "drive distance" would then assume a crossing the
+      // graph forbids and understate (gpt-5.6-sol R8+R9). If the connector
+      // passes near ANY cut segment, show the direct readout instead.
+      if (BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, start, s[0], s[1]) < 25)) {
+        return null;
+      }
+      const r = network.route(start.id, openPoi.nodeId);
+      if (!r || r.path.length < 2) return null;
+      return gap + r.totalM;
+    } catch {
+      return null;
+    }
+  }, [openPoi, user, network]);
 
   // In full-screen map mode the place popup and the toast both sit at the bottom
   // of the screen, so a toast would land on top of the popup's buttons. Measure
@@ -1151,7 +1185,13 @@ export default function App() {
                   Phase 1 (NAV_ENABLED + runtime navAuth) — see reserve.ts. */}
               {(user || navOn) && (
                 <div className="poi-pop-actions">
-                  {user && <span className="poi-pop-dist">{formatDistance(distanceMeters(user, poiWorld(openPoi)))} away</span>}
+                  {user && (
+                    <span className="poi-pop-dist">
+                      {openPoiDriveM != null
+                        ? `Drive distance approx: ${formatDistance(openPoiDriveM)}`
+                        : `${formatDistance(distanceMeters(user, poiWorld(openPoi)))} direct`}
+                    </span>
+                  )}
                   {navOn &&
                     (destPoiId && destPoiId !== openPoi.id && !stops.includes(openPoi.id) ? (
                       <>
@@ -1529,7 +1569,7 @@ function ExploreTab(props: {
             <div className="card-sub">{poi.blurb}</div>
           </div>
           <div className="card-side">
-            {props.user && <div className="dist">{formatDistance(dist)}</div>}
+            {props.user && <div className="dist">{formatDistance(dist)} direct</div>}
             {props.navEnabled && (
               <button
                 className="btn btn-accent sm"
