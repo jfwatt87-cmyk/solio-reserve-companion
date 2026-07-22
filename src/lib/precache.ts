@@ -165,7 +165,8 @@ export async function requestPersistentStorage(): Promise<boolean> {
  * - Abort stops promptly (the signal is passed to fetch) and reports
  *   `aborted: true`; the caller decides how to resume.
  * - Never throws for per-tile problems; throws only if the manifest itself is
- *   unavailable or Cache Storage is unusable.
+ *   unavailable, structurally invalid (empty, duplicate tiles, count/digest
+ *   mismatch) or Cache Storage is unusable.
  */
 export async function precacheTiles(
   base: string,
@@ -185,6 +186,18 @@ export async function precacheTiles(
   const urls: string[] = [];
   for (const z of Object.keys(manifest.byZoom).sort((a, b) => Number(a) - Number(b))) {
     for (const u of manifest.byZoom[z]) urls.push(base + u);
+  }
+
+  // Structural validation (post-release audit 2026-07-22): an empty or
+  // internally inconsistent manifest must FAIL the save, never vacuously
+  // succeed. Without this, zero URLs skipped every fetch loop, passed the
+  // final presence scan trivially, and marked a tile-less pyramid "saved" —
+  // the exact dead-map-in-the-bush outcome the honesty contract forbids.
+  if (urls.length === 0) throw new Error("tile manifest is empty");
+  if (new Set(urls).size !== urls.length) throw new Error("tile manifest has duplicate tiles");
+  if (manifest.count !== urls.length) throw new Error("tile manifest count mismatch");
+  if (Object.keys(manifest.digests ?? {}).length !== urls.length) {
+    throw new Error("tile manifest digests incomplete");
   }
 
   const total = urls.length;

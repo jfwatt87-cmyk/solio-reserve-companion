@@ -59,10 +59,12 @@ Useful URL params: `?skipWelcome` (skip the welcome screen), `?tab=drives`
 **See [DEPLOY.md](DEPLOY.md) — read it before touching production.** Short
 version: Cloudflare Pages (map.soliogamereserve.org) is the **primary**,
 deployed manually via `npm run deploy:prod` (guarded: clean, in-sync `main`
-only, and it unsets the wrong-account `CLOUDFLARE_API_TOKEN`). Pushing to
-`main` auto-publishes only the **GitHub Pages mirror**
-(`.github/workflows/deploy.yml`) — a push is never a full release. There is no
-server component today — the app is static files.
+only, and it unsets the wrong-account `CLOUDFLARE_API_TOKEN`). The same script
+publishes the **GitHub Pages mirror**: it force-pushes the exact built
+artifact to `gh-pages` and dispatches the publish workflow
+(`.github/workflows/deploy.yml`, `workflow_dispatch`-only). Pushing to `main`
+deploys **nothing** — a push is never a release (D57). There is no server
+component today — the app is static files.
 
 The production build is unusual in a good way:
 

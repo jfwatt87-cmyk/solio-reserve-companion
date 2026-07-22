@@ -20,6 +20,13 @@ if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
   exit 1
 fi
 
+# Road-network safety tests run UNCONDITIONALLY (post-release audit 2026-07-22):
+# they were a manual "touched roads?" checklist item, so a bad edge across a
+# permanent closure could build, deploy, and feed the drive-distance readout
+# without ever being checked. set -e makes a failure fatal here.
+echo "deploy:prod: road-network safety tests…"
+npm run test:roads
+
 echo "deploy:prod: building clean main ($(git rev-parse --short HEAD))…"
 npm run build
 
@@ -31,7 +38,7 @@ env -u CLOUDFLARE_API_TOKEN npx wrangler pages deploy dist --project-name solio-
 sha=$(git rev-parse --short HEAD)
 echo
 echo "deploy:prod: verifying the primary serves this build (version.json)…"
-for i in 1 2 3; do
+for i in 1 2 3 4 5 6; do
   live=$(curl -s --max-time 10 "https://map.soliogamereserve.org/version.json" | sed -n 's/.*"sha":"\([^"]*\)".*/\1/p')
   [ "$live" = "$sha" ] && break
   sleep 10
@@ -39,7 +46,13 @@ done
 if [ "$live" = "$sha" ]; then
   echo "deploy:prod: PRIMARY VERIFIED — serving $live"
 else
-  echo "deploy:prod: WARNING — primary reports '$live', expected '$sha' (propagation lag? investigate before tagging)" >&2
+  # FATAL, not a warning (post-release audit 2026-07-22): a mismatch that only
+  # warned let a stale host be recorded as a successful deploy. The mirror has
+  # NOT been updated at this point — resolve the primary and re-run deploy:prod
+  # (idempotent). Do NOT tag.
+  echo "deploy:prod: FATAL — primary reports '$live', expected '$sha' after 60s." >&2
+  echo "deploy:prod: mirror NOT updated; hosts may be split. Fix the primary, re-run deploy:prod, do NOT tag." >&2
+  exit 1
 fi
 
 # Single-artifact mirror (D78): the GH Pages mirror must serve the EXACT files
@@ -68,8 +81,13 @@ done
 if [ "$mirror" = "$sha" ]; then
   echo "deploy:prod: MIRROR VERIFIED — serving $mirror (same artifact)"
 else
-  echo "deploy:prod: WARNING — mirror reports '$mirror', expected '$sha' (check the Actions run before tagging)" >&2
+  # FATAL (post-release audit 2026-07-22): hosts are SPLIT — the primary serves
+  # $sha but the mirror does not. Check the Actions run, then re-run
+  # deploy:prod until both hosts verify. Do NOT tag a split release.
+  echo "deploy:prod: FATAL — mirror reports '$mirror', expected '$sha' (hosts are SPLIT: primary serves $sha)." >&2
+  echo "deploy:prod: check the Actions run and re-run deploy:prod; do NOT tag until both hosts verify." >&2
+  exit 1
 fi
 
 echo
-echo "deploy:prod: if BOTH hosts verified, tag: git tag release-$(date +%Y%m%d)-$sha && git push --tags"
+echo "deploy:prod: BOTH HOSTS VERIFIED — tag: git tag release-$(date +%Y%m%d)-$sha && git push --tags"
