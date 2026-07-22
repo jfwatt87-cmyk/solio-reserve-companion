@@ -16,7 +16,7 @@
    Redirect hygiene: Cloudflare 308s ./index.html -> ./ ; a stored *redirected*
    response is rejected when replayed for a navigation, so every cached
    navigation response is normalised (re-wrapped) before it enters the cache. */
-const SHELL_CACHE = "solio-shell-v12";
+const SHELL_CACHE = "solio-shell-v13";
 const TILE_CACHE = "solio-tiles-v5";
 const TILE_PREFIX = "solio-tiles-";
 

@@ -72,7 +72,25 @@ for (const z of Object.keys(byZoom)) {
 // release runbook hash-compare the Cloudflare and GitHub Pages artifacts).
 const digest = byteHash.digest("hex").slice(0, 12);
 
-/* Guard 2: tile bytes must not change without a TILE_CACHE bump — cache-first
+/* Guard 2 (post-release audit 2026-07-22): a structurally broken pyramid must
+ * fail the BUILD, not ship. An empty tiles dir, a missing zoom level, or
+ * count/digest drift would otherwise emit a manifest the client "successfully"
+ * precaches with nothing in it — and a simultaneous tag bump would sail past
+ * the byte-lock guard below. EXPECTED_ZOOMS is the shipped pyramid's range;
+ * update it deliberately if the pyramid's zoom levels ever change. */
+const EXPECTED_ZOOMS = ["11", "12", "13", "14", "15", "16"];
+const urlCount = Object.values(byZoom).reduce((s, u) => s + u.length, 0);
+const missingZooms = EXPECTED_ZOOMS.filter((z) => !(byZoom[z]?.length > 0));
+if (count === 0 || urlCount !== count || Object.keys(digests).length !== count || missingZooms.length) {
+  console.error(
+    `[tile-manifest] FATAL: pyramid empty or inconsistent (count=${count}, urls=${urlCount}, ` +
+      `digests=${Object.keys(digests).length}` +
+      `${missingZooms.length ? `, missing zooms: ${missingZooms.join(",")}` : ""}).`,
+  );
+  process.exit(1);
+}
+
+/* Guard 3: tile bytes must not change without a TILE_CACHE bump — cache-first
  * clients would serve stale tiles forever. tools/tiles.lock.json records the
  * (tag, digest) pair of the last build; commit it whenever it changes. */
 const lockPath = join(root, "tools", "tiles.lock.json");

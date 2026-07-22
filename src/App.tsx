@@ -65,6 +65,7 @@ export default function App() {
       route: (...args: Parameters<Net["route"]>) => get().route(...args),
       alternatives: (...args: Parameters<Net["alternatives"]>) => get().alternatives(...args),
       nearestNode: (...args: Parameters<Net["nearestNode"]>) => get().nearestNode(...args),
+      nearestRoadPoint: (...args: Parameters<Net["nearestRoadPoint"]>) => get().nearestRoadPoint(...args),
     };
   }, []);
 
@@ -197,8 +198,15 @@ export default function App() {
   );
   // Offline precache progress: "saving" while pulling the pyramid, "saved" once
   // the whole reserve is on the device. Drives the quiet status-chip messaging.
-  const [precache, setPrecache] = useState<{ state: "idle" | "saving" | "saved"; pct: number }>(
-    () => ({ state: tilesAlreadyCached() ? "saved" : "idle", pct: 0 }),
+  // FAIL CLOSED (post-release audit 2026-07-22): the localStorage flag alone
+  // must never render "saved" — iOS can evict Cache Storage while leaving the
+  // flag behind, and the old optimistic initial state claimed "works offline"
+  // (and suppressed the offline warning) until the async verify resolved. A
+  // returning install starts in "checking" and is only promoted to "saved" by
+  // the launch-time verification below; if the check stalls, we keep saying
+  // "checking", never "saved".
+  const [precache, setPrecache] = useState<{ state: "idle" | "checking" | "saving" | "saved"; pct: number }>(
+    () => ({ state: tilesAlreadyCached() ? "checking" : "idle", pct: 0 }),
   );
   // Briefly hold the download bar at 100% "saved" after a save we watched, so the
   // completion is visible rather than the bar vanishing at the last percent.
@@ -325,14 +333,20 @@ export default function App() {
   // Integrity guard for silent eviction. iOS can drop the tile cache under
   // storage pressure while leaving the "saved" flag behind, so a returning guest
   // could open the app in a dead zone believing the map is downloaded. On launch,
-  // verify the saved tiles still exist; if they don't, stop claiming "saved"
-  // (honest messaging) and re-pull whenever there's signal. Since iOS can't
-  // re-download in the background, every foreground open is our chance to heal.
+  // verify the saved tiles still exist: only a passing check promotes the
+  // "checking" state to "saved" — the flag alone never does. If the tiles are
+  // gone, stop claiming anything and re-pull whenever there's signal. Since iOS
+  // can't re-download in the background, every foreground open is our chance to
+  // heal.
   useEffect(() => {
-    if (precache.state !== "saved") return;
+    if (precache.state !== "checking") return;
     let cancelled = false;
     verifyTilesCached().then((ok) => {
-      if (cancelled || ok) return;
+      if (cancelled) return;
+      if (ok) {
+        setPrecache({ state: "saved", pct: 1 });
+        return;
+      }
       invalidateTileCache();
       precacheStarted.current = false;
       setPrecache({ state: "idle", pct: 0 });
@@ -419,8 +433,10 @@ export default function App() {
   useEffect(() => {
     if (revealed || !mapLoaded) return;
     if (precache.state === "saved" || !online) { setRevealed(true); return; }
-    if (precache.state === "idle") {
-      // no save has started shortly after the map is ready → none will (no SW)
+    if (precache.state === "idle" || precache.state === "checking") {
+      // idle: no save has started shortly after the map is ready → none will
+      // (no SW). checking: the launch verify normally resolves in milliseconds;
+      // the timer is only a backstop against a stalled Cache API.
       const t = setTimeout(() => setRevealed(true), 6000);
       return () => clearTimeout(t);
     }
@@ -578,28 +594,44 @@ export default function App() {
   // (NAV_ENABLED gates all guidance UI; this shows a number, it never routes a
   // guest anywhere). "Approx" is load-bearing: the graph still carries cut
   // river crossings awaiting Callan's GIS (D91/D92), so some pairs read up to
-  // ~1.6 km long — overstated, never understated. Computed only while a popup
-  // is open: the first call pays the lazy graph build (user-initiated, one
-  // time), and startup stays as cheap as before. Off/far from the road
-  // network (>2 km to the nearest node) falls back to the direct readout.
+  // ~1.6 km long. Computed only while a popup is open: the first call pays the
+  // lazy graph build (user-initiated, one time), and startup stays as cheap as
+  // before. Off/far from the road network (>2 km) falls back to the direct
+  // readout.
   const openPoiDriveM = useMemo(() => {
     if (!openPoi || !user) return null;
     try {
-      const start = network.nearestNode(user);
-      const gap = distanceMeters(user, start);
-      if (gap > 2000) return null;
-      // The user->start connector is a straight line the road graph never
+      // Snap to the nearest point ON a road edge, not the nearest graph NODE.
+      // Node-snapping understated real drives by kilometres when the guest sat
+      // mid-edge on a long road but straight-line-nearer to some other road's
+      // junction (post-release audit 2026-07-22: 2.3 km shown vs 9.1 km real
+      // at the g190–g147 midpoint). The drive is then routed from BOTH ends of
+      // the occupied edge, each plus its along-the-road distance — the shorter
+      // total is what the guest would actually drive.
+      const snap = network.nearestRoadPoint(user);
+      if (!snap || snap.gapM > 2000) return null;
+      // The user->road connector is a straight line the road graph never
       // vetted: a guest beside a cut crossing — private (S18/S20) or
-      // permission-unknown (S05/S06/S16/S21/S22) — can snap to a node on the
-      // FAR side, and the "drive distance" would then assume a crossing the
-      // graph forbids and understate (gpt-5.6-sol R8+R9). If the connector
-      // passes near ANY cut segment, show the direct readout instead.
-      if (BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, start, s[0], s[1]) < 25)) {
+      // permission-unknown (S05/S06/S16/S21/S22) — can snap to the FAR side,
+      // and the "drive distance" would then assume a crossing the graph
+      // forbids and understate (gpt-5.6-sol R8+R9). If the connector passes
+      // near ANY cut segment, show the direct readout instead.
+      if (BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, snap.point, s[0], s[1]) < 25)) {
         return null;
       }
-      const r = network.route(start.id, openPoi.nodeId);
-      if (!r || r.path.length < 2) return null;
-      return gap + r.totalM;
+      let best: number | null = null;
+      for (const [endId, alongM] of [
+        [snap.aId, snap.alongToAM],
+        [snap.bId, snap.alongToBM],
+      ] as const) {
+        const r = network.route(endId, openPoi.nodeId);
+        if (!r) continue; // disconnected component — try the other endpoint
+        // r.totalM is 0 when the POI IS this endpoint: the along-edge distance
+        // already covers the drive, so an empty route path is fine here.
+        const total = snap.gapM + alongM + r.totalM;
+        if (best === null || total < best) best = total;
+      }
+      return best;
     } catch {
       return null;
     }
@@ -996,6 +1028,8 @@ export default function App() {
                   ? storageDurable ? "Map saved · works offline" : "Map saved · works offline for now"
                   : precache.state === "saving"
                   ? `Saving map… ${Math.round(precache.pct * 100)}%`
+                  : precache.state === "checking"
+                  ? "Checking saved map…"
                   : online
                   ? "Map not saved yet"
                   : "Map not saved · offline"}
@@ -1337,7 +1371,7 @@ export default function App() {
 function Welcome(props: {
   isDemo: boolean;
   onStart: () => void;
-  saveState: "idle" | "saving" | "saved";
+  saveState: "idle" | "checking" | "saving" | "saved";
   savePct: number;
   online: boolean;
   durable: boolean;
@@ -1390,6 +1424,10 @@ function Welcome(props: {
               The reserve has little or no signal — keep this open until it finishes.
             </span>
           </div>
+        ) : props.saveState === "checking" ? (
+          // Honest interim: the saved map is being re-verified (normally
+          // milliseconds). Neither claim "saved" nor warn "not saved" yet.
+          <p className="welcome-save-note">Checking your saved map…</p>
         ) : props.online ? (
           <p className="welcome-save-note">
             The reserve has little or no phone signal. Keep this open on WiFi until it

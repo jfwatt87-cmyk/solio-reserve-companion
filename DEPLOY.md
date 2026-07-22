@@ -26,11 +26,13 @@ Cloudflare, and force-pushed verbatim to the `gh-pages` branch for the mirror.
    then rebuilds before deploying.
 4. **Both hosts self-verify** in `deploy:prod`: it curls each host's
    `version.json` until it reports the released SHA (`PRIMARY VERIFIED` /
-   `MIRROR VERIFIED`). On any WARNING, investigate before tagging. Then load
-   the site and confirm the change is visible. Custom-domain propagation can
-   lag a few minutes behind pages.dev.
-   Touched the road network? `npm run test:roads` must pass before committing
-   a regenerated roads.gis.ts.
+   `MIRROR VERIFIED`). A mismatch is **FATAL** — the script exits non-zero and
+   the release is not done; fix the failing host and re-run `deploy:prod`
+   until both verify (never tag a split release). Then load the site and
+   confirm the change is visible. Custom-domain propagation can lag a few
+   minutes behind pages.dev.
+   `npm run test:roads` runs unconditionally inside `deploy:prod` (and must
+   still pass locally before committing a regenerated roads.gis.ts).
 5. **Tag every release**: `git tag release-YYYYMMDD-<shortsha> && git push --tags`.
    Tags are the rollback anchors.
 6. **Never hand-edit or branch off `gh-pages`.** It is a machine-written
