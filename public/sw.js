@@ -16,8 +16,8 @@
    Redirect hygiene: Cloudflare 308s ./index.html -> ./ ; a stored *redirected*
    response is rejected when replayed for a navigation, so every cached
    navigation response is normalised (re-wrapped) before it enters the cache. */
-const SHELL_CACHE = "solio-shell-v11";
-const TILE_CACHE = "solio-tiles-v4";
+const SHELL_CACHE = "solio-shell-v12";
+const TILE_CACHE = "solio-tiles-v5";
 const TILE_PREFIX = "solio-tiles-";
 
 const SHELL_ASSETS = [
@@ -134,7 +134,10 @@ self.addEventListener("fetch", (e) => {
                 older ||
                 fetch(req).then((resp) => {
                   const type = resp.headers.get("content-type") || "";
-                  if (resp.ok && resp.type === "basic" && type.startsWith("image/")) {
+                  // Never cache query-keyed tile requests (the precacher's
+                  // cache-busting fetches) — only canonical URLs may enter the
+                  // cache, so strays can't mask or shadow real entries.
+                  if (resp.ok && resp.type === "basic" && type.startsWith("image/") && !url.search) {
                     const copy = resp.clone();
                     e.waitUntil(caches.open(TILE_CACHE).then((c) => c.put(req, copy)).catch(() => {}));
                   }
