@@ -187,13 +187,13 @@ body {
 .route-draw { stroke-dasharray: 2600; stroke-dashoffset: 2600; animation: draw 0.9s ease forwards; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 
-.map-controls { position: absolute; right: 12px; bottom: 52px; display: flex; flex-direction: column; gap: 6px; }
+.map-controls { position: absolute; right: 12px; bottom: 52px; display: flex; flex-direction: column; gap: 6px; z-index: 4; /* above markers (mk-user 3 / mk-poi 2), below layers panel (6) */ }
 .map-controls button {
   width: 38px; height: 38px; border: none; border-radius: 10px;
   background: rgba(244, 239, 230, 0.94); color: var(--ink); font-size: 19px;
   box-shadow: var(--shadow); cursor: pointer;
 }
-.map-floating { position: absolute; left: 12px; bottom: 52px; display: flex; flex-direction: column; gap: 8px; }
+.map-floating { position: absolute; left: 12px; bottom: 52px; display: flex; flex-direction: column; gap: 8px; z-index: 4; /* above markers, below layers panel */ }
 .fab {
   width: 46px; height: 46px; border: none; border-radius: 50%;
   background: #2f6fed; color: #fff; box-shadow: var(--shadow); cursor: pointer;
@@ -313,11 +313,14 @@ body {
   background:
     radial-gradient(120% 80% at 50% 0%, #626c44 0%, transparent 60%),
     linear-gradient(160deg, #4a533b 0%, #2c3323 100%);
-  display: flex; align-items: center; justify-content: center; padding: 26px;
+  /* margin:auto on the card centers it when there's room and keeps the whole
+     card reachable by scroll when there isn't — align-items:center would clip
+     the top AND bottom of an overflowing card, stranding the enter button. */
+  display: flex; padding: 26px; overflow-y: auto;
   animation: fade 0.3s ease;
 }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-.welcome-card { text-align: center; color: var(--bone); max-width: 320px; }
+.welcome-card { text-align: center; color: var(--bone); max-width: 320px; margin: auto; }
 .welcome-kicker { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--ochre); font-weight: 700; }
 .welcome-brand { font-family: var(--display); font-weight: 600; font-size: 46px; letter-spacing: 6px; margin: 2px 0 4px; }
 .welcome-tag { font-family: var(--display); font-style: italic; font-size: 15px; color: rgba(244, 239, 230, 0.78); margin-bottom: 18px; }
