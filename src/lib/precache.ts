@@ -21,12 +21,26 @@ export type PrecacheResult = {
   done: number;
   total: number;
 };
-type Manifest = { count: number; bytes: number; byZoom: Record<string, string[]> };
+type Manifest = {
+  /** Tile cache tag this manifest was generated for. precacheTiles refuses a
+   *  manifest whose tag differs from TILE_CACHE_TAG — a previous release's
+   *  cached manifest must never drive (or verify) this release's precache. */
+  tag?: string;
+  count: number;
+  bytes: number;
+  byZoom: Record<string, string[]>;
+  /** sha-256 (first 16 hex) per tile path — lets the precacher verify bytes
+   *  end-to-end. Behaviourally REQUIRED: a tile without a digest counts as
+   *  FAILED (fail closed), so a stale digest-less manifest can never disable
+   *  verification. Optional in the type only because old cached manifests
+   *  genuinely lack the field. */
+  digests?: Record<string, string>;
+};
 
 // The Cache Storage bucket the tiles live in. MUST equal TILE_CACHE in
 // public/sw.js — the prebuild step fails the build if they diverge. Bump both
 // ONLY when the tile pyramid changes, so phones re-pull it.
-export const TILE_CACHE_TAG = "solio-tiles-v4";
+export const TILE_CACHE_TAG = "solio-tiles-v5";
 
 const CACHED_KEY = "solio-tiles-cached";
 // Expected tile count, stored at save time so verification can compare the
@@ -94,7 +108,12 @@ export async function verifyTilesCached(): Promise<boolean> {
       if (!expected) return false;
     }
     const keys = await cache.keys();
-    const tiles = keys.filter((k) => new URL(k.url).pathname.includes("/tiles/")).length;
+    // Canonical entries only — query-keyed strays from cache-busted fetches
+    // must not inflate the count and fake offline-readiness.
+    const tiles = keys.filter((k) => {
+      const u = new URL(k.url);
+      return u.pathname.includes("/tiles/") && !u.search;
+    }).length;
     return tiles >= expected;
   } catch {
     return false;
@@ -156,6 +175,11 @@ export async function precacheTiles(
   const res = await fetch(base + "tiles-manifest.json", { cache: "no-cache", signal });
   if (!res.ok) throw new Error("tile manifest unavailable");
   const manifest = (await res.json()) as Manifest;
+  // Release-bind the manifest: digests alone are not enough — on a future
+  // upgrade a controlling older SW could serve ITS digest-bearing manifest
+  // (network-first fetch failed), and the old pyramid would verify cleanly
+  // against the old digests. Wrong tag = stale manifest = no precache.
+  if (manifest.tag !== TILE_CACHE_TAG) throw new Error("tile manifest is for another release");
 
   // Low zooms first (whole-reserve overview survives even if z16 gets evicted).
   const urls: string[] = [];
@@ -168,16 +192,55 @@ export async function precacheTiles(
   let done = 0;
   const report = () => onProgress({ done, total });
 
+  // Expected digest for a tile URL (manifest paths are relative to `base`).
+  const expectedDigest = (url: string): string | undefined =>
+    manifest.digests?.[url.startsWith(base) ? url.slice(base.length) : url];
+
+  async function sha256hex16(buf: ArrayBuffer): Promise<string> {
+    const h = await crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(h))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 16);
+  }
+
   async function fetchInto(url: string): Promise<boolean> {
-    // Already cached (previous partial run / panned-over tile): count it, skip.
-    if (await cache.match(url)) return true;
-    const resp = await fetch(url, { cache: "no-cache", signal });
-    const type = resp.headers.get("content-type") || "";
-    // Only a real image may enter the cache — an SPA-fallback/error page that
-    // returns 200 text/html must count as a FAILURE, not a saved tile.
-    if (!resp.ok || !type.startsWith("image/")) return false;
-    await cache.put(url, resp);
-    return true;
+    const want = expectedDigest(url);
+    // Fail CLOSED: this release ships a digest for every tile. No digest means
+    // we are working from a stale manifest (the network-first manifest fetch
+    // failed and a previous SW generation served its cached copy) — verifying
+    // nothing would silently reopen the stale-tile-promotion hole, so the tile
+    // counts as FAILED and the pyramid is not marked saved.
+    if (!want) return false;
+    // Already cached (previous partial run / panned-over tile): trust it only
+    // if the bytes match this release's digest — the service worker's
+    // older-cache fallback means a same-URL hit can be a previous generation.
+    const hit = await cache.match(url);
+    if (hit) {
+      if ((await sha256hex16(await hit.clone().arrayBuffer())) === want) return true;
+      await cache.delete(url);
+    }
+    // First try the plain URL; if the bytes are stale (an older SW generation
+    // answered from its cache), retry with a cache-busting query no SW cache
+    // can hold — the nonce makes every retry URL unique, so a bad response a
+    // SW cached under an earlier busted URL can never satisfy a later attempt.
+    // Always store under the canonical URL so runtime lookups hit.
+    const nonce = () =>
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    for (const attempt of [url, `${url}?v=${want}&r=${nonce()}`]) {
+      const resp = await fetch(attempt, { cache: "no-cache", signal });
+      const type = resp.headers.get("content-type") || "";
+      // Only a real image may enter the cache — an SPA-fallback/error page that
+      // returns 200 text/html must count as a FAILURE, not a saved tile.
+      if (!resp.ok || !type.startsWith("image/")) return false;
+      const buf = await resp.arrayBuffer();
+      if ((await sha256hex16(buf)) !== want) continue; // stale bytes
+      await cache.put(url, new Response(buf, { headers: { "content-type": type } }));
+      return true;
+    }
+    return false;
   }
 
   async function pass(list: string[]): Promise<string[]> {
@@ -207,21 +270,43 @@ export async function precacheTiles(
     return failed;
   }
 
+  // Abort-aware sleep: an abort mid-backoff must end the run promptly, not
+  // after the timer expires.
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => {
+      const t = setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(t);
+        resolve();
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
+
   let pending = urls;
   for (let attempt = 0; attempt < 3 && pending.length > 0; attempt++) {
     if (signal?.aborted) break;
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt));
+    if (attempt > 0) await sleep(1500 * attempt);
     pending = await pass(pending);
   }
 
   if (signal?.aborted) return { saved: false, aborted: true, done, total };
   if (pending.length > 0) return { saved: false, aborted: false, done, total };
 
-  // Belt and braces: the flag is only persisted if Cache Storage really holds
-  // the pyramid (>= because the manifest itself may share the cache).
-  const keys = await cache.keys();
-  const tileKeys = keys.filter((k) => new URL(k.url).pathname.includes("/tiles/")).length;
-  if (tileKeys < total) return { saved: false, aborted: false, done, total };
+  // Belt and braces: the flag is only persisted if Cache Storage holds every
+  // CANONICAL tile of this release. Checking the expected URL set (not a key
+  // count) means query-keyed strays a service worker wrote for cache-busted
+  // fetches can never mask a missing canonical entry. Abort is honoured here
+  // too — the contract is "abort stops promptly", including this scan.
+  for (const url of urls) {
+    if (signal?.aborted) return { saved: false, aborted: true, done, total };
+    if (!(await cache.match(url))) return { saved: false, aborted: false, done, total };
+  }
+  // The last match() above may have resolved after an abort — honour it before
+  // persisting the flag, or a cancelled run can still report saved: true.
+  if (signal?.aborted) return { saved: false, aborted: true, done, total };
 
   report();
   markCached(total);

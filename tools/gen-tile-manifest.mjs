@@ -53,11 +53,17 @@ for (const z of readdirSync(tilesDir).sort((a, b) => Number(a) - Number(b))) {
 }
 
 // Hash the tile BYTES (in stable path order), not just the path list — an
-// in-place JPEG edit must change the digest (audit 2026-07-10).
+// in-place JPEG edit must change the digest (audit 2026-07-10). Per-tile
+// digests also ship in the manifest so the precacher can verify every tile
+// end-to-end: a service worker serving an older cache generation for the same
+// URL must never be able to satisfy a precache request (review 2026-07-22).
+const digests = {};
 for (const z of Object.keys(byZoom)) {
   for (const u of byZoom[z]) {
+    const buf = readFileSync(join(root, "public", u));
     byteHash.update(u);
-    byteHash.update(readFileSync(join(root, "public", u)));
+    byteHash.update(buf);
+    digests[u] = createHash("sha256").update(buf).digest("hex").slice(0, 16);
   }
 }
 
@@ -88,7 +94,7 @@ if (!lock || lock.digest !== digest || lock.tag !== swTag) {
   console.log(`[tile-manifest] tiles.lock.json updated (${swTag} / ${digest}) — commit it.`);
 }
 
-const manifest = { generated: digest, count, bytes, byZoom };
+const manifest = { tag: swTag, generated: digest, count, bytes, byZoom, digests };
 const out = join(root, "public", "tiles-manifest.json");
 writeFileSync(out, JSON.stringify(manifest));
 console.log(`[tile-manifest] ${count} tiles, ${(bytes / 1e6).toFixed(1)} MB → public/tiles-manifest.json`);
