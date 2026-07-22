@@ -19,6 +19,12 @@
   background: rgba(255, 255, 255, 0.7);
 }
 .map-gl .maplibregl-ctrl-bottom-left { margin-bottom: 2px; }
+/* MapLibre control corners default to z-index 2 — lift above the markers so the
+   scale bar and attribution never sit under a pin or the user dot. */
+.map-gl .maplibregl-ctrl-top-left,
+.map-gl .maplibregl-ctrl-top-right,
+.map-gl .maplibregl-ctrl-bottom-left,
+.map-gl .maplibregl-ctrl-bottom-right { z-index: 4; }
 .map-gl .maplibregl-ctrl-scale {
   border-color: #6b4f32;
   color: #3a2a1d;
@@ -76,7 +82,11 @@
 .layer-sub input[type="range"] { flex: 1; accent-color: #7a3b1f; }
 
 /* ---- User "you are here" marker (anchor: center, 0x0 wrapper) ----------- */
-.mk-user { width: 0; height: 0; }
+/* The guest's own position must never lose a stacking fight with a POI pin:
+   POI markers are recreated whenever the Places list re-renders (it re-sorts
+   on every GPS fix), so they land later in the DOM and would cover the dot
+   exactly where it matters most — standing at a gate or lodge. */
+.mk-user { width: 0; height: 0; z-index: 3; pointer-events: none; }
 .mk-user-dot {
   position: absolute;
   left: 0;
@@ -125,6 +135,7 @@
 .mk-poi {
   cursor: pointer;
   text-align: center;
+  z-index: 2; /* always under .mk-user — see note above */
 }
 .mk-poi-pin {
   width: 26px;

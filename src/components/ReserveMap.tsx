@@ -275,8 +275,6 @@ export function ReserveMap(props: Props) {
       if (poiMarkers.current.has(p.id)) continue;
       const el = document.createElement("div");
       el.className = "mk-poi";
-      el.setAttribute("role", "button");
-      el.setAttribute("aria-label", p.name);
       el.innerHTML = poiPinSVG(p.kind);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -286,6 +284,11 @@ export function ReserveMap(props: Props) {
       const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat(toDisplay(world.lng, world.lat))
         .addTo(map);
+      // Must come after .addTo(): MapLibre overwrites aria-label ("Map marker")
+      // inside Marker.addTo(), clobbering anything set earlier — every pin read
+      // as "Map marker" to screen readers until this moved down here.
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-label", p.name);
       poiMarkers.current.set(p.id, { marker, el });
     }
   }, [ready]);
