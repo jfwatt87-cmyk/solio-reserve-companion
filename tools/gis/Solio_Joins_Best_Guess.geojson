@@ -114,15 +114,19 @@
     "crossing_confirmed": false,
     "site": "S06",
     "site_name": null,
-    "guest_routable": "unknown",
+    "guest_routable": false,
     "solio_said": [
-     "S06 = Crossing"
+     "S06 = Crossing",
+     "Yes that is passable, was that in question?",
+     "Yeah they are seasonal streams",
+     "S06 is not a passable position for the river, its just a label for the toilet, it is not a passable point to cross the river"
     ],
-    "decided": "2026-07-14",
-    "decision_note": "Crossing exists; whether guests may drive through it is UNKNOWN \u2014 nobody has asked. Cut from routing until answered. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
+    "decided": "2026-07-23",
+    "decision_note": "Closed to guest routing by agreement. Decision authored in crossing_decisions.json \u2014 do not hand-edit this field.",
     "evidence_note": "river crossing drawn on the map; GPS points nearby but NO recorded drive crosses the river within 150 m \u2014 please confirm (downgraded from HIGH)",
     "routable_basis": null,
-    "crossing_exists": true
+    "crossing_exists": false,
+    "access": "private"
    },
    "geometry": {
     "type": "LineString",

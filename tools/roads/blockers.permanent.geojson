@@ -1,7 +1,7 @@
 {
  "type": "FeatureCollection",
  "name": "Solio_Blockers_Permanent",
- "description": "Settled blocks \u2014 these never reopen on 'confirmation'. Only Solio reversing the access decision lifts one. GENERATED from crossing_decisions.json \u2014 do not hand-edit.",
+ "description": "Settled blocks \u2014 these never reopen on 'confirmation'. reason=private-access: real crossings closed at Solio's request; only Solio reversing that decision lifts one. reason=not-a-crossing: established there is no crossing here at all (the map mark at S06 is a toilet label) \u2014 nothing to reopen. GENERATED from crossing_decisions.json \u2014 do not hand-edit.",
  "crs": {
   "type": "name",
   "properties": {
@@ -9,6 +9,59 @@
   }
  },
  "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "site": "S06",
+    "site_name": null,
+    "gap_m": 43.3,
+    "crossing_exists": false,
+    "guest_routable": false,
+    "reason": "not-a-crossing",
+    "quote": [
+     "S06 = Crossing",
+     "Yes that is passable, was that in question?",
+     "Yeah they are seasonal streams",
+     "S06 is not a passable position for the river, its just a label for the toilet, it is not a passable point to cross the river"
+    ],
+    "decided": "2026-07-23",
+    "why": [
+     "NOT A CROSSING - SETTLED (James, 2026-07-23). The map mark at the S06 site is the",
+     "poster's TOILET symbol (orange dot per Jen's legend), not a river crossing. There is",
+     "no passable point to cross the river here. Cut is permanent.",
+     "",
+     "How the earlier quotes got misread: 'S06 = Crossing' (2026-07-14) and 'Yes that is",
+     "passable' (2026-07-22, green-circle image) were both answers about a mark that turns",
+     "out to be the toilet label - 'passable' meaning you can drive UP to it, not across",
+     "the river. The 2026-07-23 'seasonal streams' reply reframed the circled marks, and",
+     "checking Jen's legend (orange = TOILET) settled it. Three review rounds said the",
+     "'crossing' reading was an over-read; they were right for a better reason than anyone",
+     "knew.",
+     "",
+     "COST, NOW PERMANENT: the 15/36 POI-pair detours (all three Kingfisher recoveries,",
+     "worst case +1.60 km) are the true road network, not a pending recovery. Nothing is",
+     "unreachable. The planned guest-permission ask is CANCELLED - there is nothing to ask",
+     "permission about.",
+     "",
+     "TOILET POI: this site is a located toilet - feeds the toilet-POI patch (D102/D104",
+     "carried item) instead of any unblock."
+    ],
+    "agreed_by": null
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.937133,
+      -0.158494
+     ],
+     [
+      36.936745,
+      -0.15846
+     ]
+    ]
+   }
+  },
   {
    "type": "Feature",
    "properties": {

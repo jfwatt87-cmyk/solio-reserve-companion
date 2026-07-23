@@ -12,59 +12,6 @@
   {
    "type": "Feature",
    "properties": {
-    "site": "S06",
-    "site_name": null,
-    "gap_m": 43.3,
-    "crossing_exists": true,
-    "guest_routable": "unknown",
-    "reason": "permission-unknown",
-    "quote": [
-     "S06 = Crossing"
-    ],
-    "decided": "2026-07-14",
-    "why": [
-     "CROSSING EXISTS: quoted. 'Crossing' answers the topology question directly - unlike S16/S21,",
-     "which name the ROAD the join sits on and say nothing about the join itself.",
-     "GUEST ROUTABLE: UNKNOWN. Nobody has asked. CUT until someone does.",
-     "",
-     "The reasoning that kept it open for three review rounds: Callan flagged access restrictions",
-     "explicitly where he wanted them (S18/S20, unprompted), said nothing of the sort here, and",
-     "S06 is drawn on the guest poster - so the default should be that guests may use it. That is",
-     "a decent bet. It is not an answer, and D79 exists precisely to stop me routing on a decent",
-     "bet: 'Crossing' answers topology, not permission. Round 1 called it an over-read; round 2",
-     "called it an over-read; I answered round 2 by writing `routable_basis: inference` next to",
-     "`guest_routable: true` and calling it fixed. Labelling the guess did not stop the app acting",
-     "on the guess - the site stayed in the graph and the joins file still read 'guests may drive",
-     "it'. An inference is a reason to ask a better question, not a basis for routing (D90 F2).",
-     "",
-     "COST OF BLOCKING: 15/36 POI pairs, including all three Kingfisher recoveries",
-     "(rhinogate->kingfisher 9.36->10.95 km, kingfisher->yellowthorn 6.18->7.33,",
-     "kingfisher->naribo 7.58->9.18). Nothing becomes unreachable - every POI still routes, just",
-     "further; worst case +1.60 km. S06 is the ONLY site whose answer buys anything: S16 and S21",
-     "are worth exactly zero. That cost is why this is worth an ask, and is not a reason to assume",
-     "the answer. Nav is off, so today it costs nothing real.",
-     "",
-     "TO SETTLE: 'May guests drive through the crossing at S06?' One answer, one field.",
-     "Name NOT confirmed: our 'Browns Bridge' guess is dropped, he never said Browns."
-    ]
-   },
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.937133,
-      -0.158494
-     ],
-     [
-      36.936745,
-      -0.15846
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
     "site": "S16",
     "site_name": "Mount Kenya River Road (part)",
     "gap_m": 21.5,

@@ -118,7 +118,13 @@ def check_basis_against_evidence(sites: dict, joins: dict) -> None:
 
 
 def block_reason(s: dict) -> str:
-    """WHY this site is cut. Three different situations, three different owners."""
+    """WHY this site is cut. Four different situations, four different owners."""
+    if s["crossing_exists"] is False:
+        # Established there is NO crossing here at all — nothing to ask anyone.
+        # (S06, 2026-07-23: the map mark turned out to be the toilet label.)
+        # Checked FIRST: a settled non-crossing must never be labelled
+        # "private-access" in a client-facing file (the D87 F7 error class).
+        return "not-a-crossing"
     if s["guest_routable"] is False:
         return "private-access"          # asked and closed — Solio's decision, settled
     if s["crossing_exists"] is not True:
@@ -171,8 +177,11 @@ def build(joins: dict | None = None) -> dict[Path, dict]:
         PERMANENT: {
             "type": "FeatureCollection",
             "name": "Solio_Blockers_Permanent",
-            "description": ("Settled blocks — these never reopen on 'confirmation'. Only Solio "
-                            "reversing the access decision lifts one. GENERATED from "
+            "description": ("Settled blocks — these never reopen on 'confirmation'. "
+                            "reason=private-access: real crossings closed at Solio's request; only "
+                            "Solio reversing that decision lifts one. reason=not-a-crossing: "
+                            "established there is no crossing here at all (the map mark at S06 is "
+                            "a toilet label) — nothing to reopen. GENERATED from "
                             "crossing_decisions.json — do not hand-edit."),
             "crs": CRS,
             "features": out["settled"],
