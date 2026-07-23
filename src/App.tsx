@@ -14,13 +14,14 @@ import {
   formatDistance,
   type LatLng,
 } from "./lib/geo";
-import { stepInstruction, type Route, type RouteStep } from "./lib/routing";
+import { stepInstruction, type RoadSnap, type Route, type RouteStep } from "./lib/routing";
 import {
   GOOD_FIX_M,
   ROUTE_AGREE_M,
   gatedOriginCandidates,
-  resolveRouteStart,
+  resolveOrigin,
   originFailureMessage,
+  type Fix,
 } from "./lib/navOrigin";
 import { pathLength, poseAlong } from "./lib/sim";
 import { precacheTiles, tilesAlreadyCached, verifyTilesCached, invalidateTileCache, requestPersistentStorage } from "./lib/precache";
@@ -42,6 +43,10 @@ const SPEED_MPS = 15; // simulated game-drive speed (~54 km/h peak on tracks)
 const ETA_MPS = 7;    // display-only ETA speed (~25 km/h — realistic on game-drive tracks)
 // GOOD_FIX_M (the ≤50 m precise-fix threshold) now lives in lib/navOrigin —
 // the shared gate every routing consumer goes through (D115).
+// A GPS fix older than this is not evidence of where the guest is NOW — a
+// vehicle covers ~200 m in 15 s at game-drive speed. watchPosition delivers
+// ~1/s when healthy, so a stale snapshot means the signal is gone.
+const FIX_FRESH_MS = 15_000;
 // A looping demo patrol through network nodes (see data/roadSource.ts). Each leg
 // is routed along the traced roads, so the demo dot drives the drawn tracks.
 const PATROL = ["gate", "j1", "jw", "j2", "j3", "j4", "naribo", "j5", "choroa", "j2", "j1", "gate"];
@@ -71,8 +76,12 @@ export default function App() {
       route: (...args: Parameters<Net["route"]>) => get().route(...args),
       alternatives: (...args: Parameters<Net["alternatives"]>) => get().alternatives(...args),
       // Raw nearestNode is deliberately NOT exposed (D115): every live-position
-      // snap must go through lib/navOrigin's gated resolution. Position-free
-      // routing (sim patrol legs, POI-to-POI) uses node ids directly.
+      // snap must go through lib/navOrigin's gated resolution, and every route
+      // FROM a live position must be built with routeFrom/alternativesFrom so
+      // the approach leg is part of the route. Position-free routing (sim
+      // patrol legs, POI-to-POI) uses node ids directly.
+      routeFrom: (...args: Parameters<Net["routeFrom"]>) => get().routeFrom(...args),
+      alternativesFrom: (...args: Parameters<Net["alternativesFrom"]>) => get().alternativesFrom(...args),
       nearestRoadPoints: (...args: Parameters<Net["nearestRoadPoints"]>) => get().nearestRoadPoints(...args),
     };
   }, []);
@@ -139,9 +148,13 @@ export default function App() {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const userRef = useRef(user);
   userRef.current = user;
-  // Accuracy mirrored into a ref for effects that must read the CURRENT fix
-  // quality without re-running on every GPS tick (route preview, replan).
-  const accuracyRef = useRef<number | null>(null);
+  // The last GPS fix as ONE atomic snapshot — position, sanitised accuracy and
+  // timestamp from the same geolocation callback. Routing must never judge a
+  // position by a different generation's accuracy, keep trusting a "good"
+  // accuracy through a GPS error/outage, or trust one forever (D115 review,
+  // MAJOR 4): the error callback and the watch teardown null it, and
+  // `routingFix()` refuses anything older than FIX_FRESH_MS.
+  const fixRef = useRef<{ pos: LatLng; accuracy: number | null; at: number } | null>(null);
 
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [openPoiId, setOpenPoiId] = useState<string | null>(
@@ -522,9 +535,16 @@ export default function App() {
 
   // Real-GPS navigation progress: how far along the active route the live device
   // position is, so the turn-by-turn banner + remaining distance track reality.
+  // GATED (D115 review, MAJOR 3): a poor/unknown/stale fix must not advance,
+  // regress or re-aim guidance — a guest missing a junction during a bad-GPS
+  // spell would otherwise watch instructions drift while the position is
+  // fiction. Guidance FREEZES instead, and the drive banner says so
+  // (`guidancePaused` below).
   useEffect(() => {
     if (source !== "gps" || !driving || !activeRoute || !user) return;
-    setSimDist(projectOnPath(user, activeRoute.path).along);
+    const rf = routingFix();
+    if (!rf || !(rf.fix.accuracy != null && rf.fix.accuracy <= GOOD_FIX_M)) return;
+    setSimDist(projectOnPath(rf.pos, activeRoute.path).along);
   }, [source, driving, activeRoute, user]);
 
   // ---- Live re-routing -----------------------------------------------------
@@ -539,15 +559,24 @@ export default function App() {
     if (Date.now() - lastReroute.current < 2500) return;
     const dest = POIS.find((p) => p.id === destPoiId);
     if (!dest) return;
-    // Gated origin (D115): never re-route off a poor/unknown-accuracy fix or
-    // an ambiguous wrong-edge snap — acting on a bad fix is how a guest gets
+    // Gated origin (D115): never re-route off a poor/unknown/stale fix or an
+    // ambiguous wrong-edge snap — acting on a bad fix is how a guest gets
     // re-routed onto a road they're not on. Keep the current route and let
     // the next good fix re-trigger (deviation persists, throttle allows a
-    // retry every 2.5 s). Classic sat-nav behaviour: ignore bad fixes.
-    const res = resolveRouteStart(network, user, { source, accuracy: accuracyRef.current }, dest.nodeId);
+    // retry every 2.5 s). Classic sat-nav behaviour: ignore bad fixes; the
+    // drive banner shows "guidance paused" meanwhile.
+    const rf = routingFix();
     lastReroute.current = Date.now();
+    if (!rf) return;
+    const res = resolveOrigin(network, rf.pos, rf.fix, dest.nodeId);
     if (!res.ok) return;
-    const r = network.route(res.startId, dest.nodeId);
+    // Route FROM the snap (approach leg included) and THROUGH any remaining
+    // stops — the old re-route went start-node→final-destination, silently
+    // abandoning the stop list the panel still displayed (D115 review,
+    // BLOCKER + MAJOR 5).
+    const r = stops.length
+      ? multiStopFrom(res.snap, [...stops, destPoiId])
+      : network.routeFrom(res.snap, dest.nodeId);
     detouring.current = false;
     if (!r || r.path.length < 2) { setPlaying(true); return; }
     setActiveRoute(r);
@@ -555,7 +584,7 @@ export default function App() {
     setSimDist(0);
     setPlaying(true);
     setToast("Off route — recalculating…");
-  }, [user, driving, destPoiId, activeRoute, network, source]);
+  }, [user, driving, destPoiId, activeRoute, network, source, stops]);
 
   // ---- Device GPS ----------------------------------------------------------
   // Held until the welcome is dismissed so the browser's permission prompt is a
@@ -579,25 +608,56 @@ export default function App() {
         // (gpt-5.6-sol round 4). Negative accuracy is equally malformed.
         const fixAcc =
           Number.isFinite(p.coords.accuracy) && p.coords.accuracy >= 0 ? p.coords.accuracy : null;
-        accuracyRef.current = fixAcc;
+        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        fixRef.current = { pos, accuracy: fixAcc, at: Date.now() };
         setAccuracy(fixAcc);
-        setUser({ lat: p.coords.latitude, lng: p.coords.longitude });
+        setUser(pos);
         if (p.coords.heading != null && !Number.isNaN(p.coords.heading)) {
           setHeading(p.coords.heading);
         }
       },
-      (err) => setGpsError(friendlyGpsError(err)),
+      (err) => {
+        // A GPS error means the last snapshot no longer describes the present:
+        // drop it so routing refuses (poor-fix) instead of trusting a 10 m
+        // accuracy from before a signal loss while the vehicle kept moving
+        // (D115 review, MAJOR 4). The map dot keeps the last position for
+        // display; routing does not. Accuracy state is nulled too so the
+        // status line and the popup's memo react (unknown = poor).
+        fixRef.current = null;
+        setAccuracy(null);
+        setGpsError(friendlyGpsError(err));
+      },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
     return () => {
       navigator.geolocation.clearWatch(id);
-      // No active watch = no known fix quality. Leaving a stale "good"
-      // accuracy behind would let the routing gate pass on old information
-      // if GPS is re-entered later.
-      accuracyRef.current = null;
+      // No active watch = no known fix. Leaving a stale "good" snapshot
+      // behind would let the routing gate pass on old information if GPS is
+      // re-entered later.
+      fixRef.current = null;
       setAccuracy(null);
     };
   }, [source, showWelcome]);
+
+  // The ONE way a routing consumer obtains a position+fix pair. Guarantees the
+  // position and the accuracy judging it come from the SAME geolocation
+  // callback, and that a snapshot older than FIX_FRESH_MS (or invalidated by a
+  // GPS error) is treated as accuracy-unknown — which the navOrigin gate
+  // refuses. Sim positions are exact by construction.
+  function routingFix(): { pos: LatLng; fix: Fix } | null {
+    if (source === "sim") {
+      const pos = userRef.current;
+      return pos ? { pos, fix: { source: "sim", accuracy: null } } : null;
+    }
+    const snap = fixRef.current;
+    if (snap && Date.now() - snap.at <= FIX_FRESH_MS) {
+      return { pos: snap.pos, fix: { source: "gps", accuracy: snap.accuracy } };
+    }
+    // Stale/errored/none: keep the last-known position only so refusal
+    // messages can reference it; the null accuracy guarantees refusal.
+    const pos = userRef.current;
+    return pos ? { pos, fix: { source: "gps", accuracy: null } } : null;
+  }
 
   // Notify once when a live guest crosses the reserve boundary (either way). The
   // buffered test keeps a guest at a gate — which sits on the fence — "inside",
@@ -638,8 +698,12 @@ export default function App() {
       // drift apart again. History of why each rule exists is documented
       // there (D105–D108: three adversarial review rounds on this one number).
       // Any failure → null → the labelled direct readout. Only the DISPLAY
-      // policy stays here.
-      const g = gatedOriginCandidates(network, user, { source, accuracy }, openPoi.nodeId);
+      // policy stays here. routingFix() supplies the position+accuracy as one
+      // atomic, freshness-bounded snapshot (a GPS error/outage nulls the
+      // accuracy state, which re-runs this memo and drops the routed number).
+      const rf = routingFix();
+      if (!rf) return null;
+      const g = gatedOriginCandidates(network, rf.pos, rf.fix, openPoi.nodeId);
       if (!g.ok) return null;
       let minTotal = Infinity;
       let maxTotal = -Infinity;
@@ -690,12 +754,14 @@ export default function App() {
     // edge-projection / ambiguity / blocker rules as the popup's drive
     // distance — previewing a route from the wrong road is the same defect
     // as displaying the wrong number, with turn-by-turn consequences.
-    // accuracyRef (not state) so this effect doesn't re-run per GPS tick;
-    // on refusal the destination is cleared, so the guest simply taps again
-    // once their fix settles.
-    const res = resolveRouteStart(network, from, { source, accuracy: accuracyRef.current }, dest.nodeId);
+    // routingFix (refs, not state) so this effect doesn't re-run per GPS
+    // tick; on refusal the destination is cleared, so the guest simply taps
+    // again once their fix settles.
+    const rf = routingFix();
+    if (!rf) return;
+    const res = resolveOrigin(network, rf.pos, rf.fix, dest.nodeId);
     if (!res.ok) {
-      const near = distanceMeters(from, poiWorld(dest)) < 250;
+      const near = distanceMeters(rf.pos, poiWorld(dest)) < 250;
       setToast(near && (res.reason === "off-network" || res.reason === "no-route")
         ? `You're already at ${dest.name}`
         : originFailureMessage(res.reason, dest.name));
@@ -705,9 +771,13 @@ export default function App() {
       return;
     }
     // With stops, offer the single via-route; without, offer alternatives.
+    // Both are built FROM the snap: the approach leg is part of every option's
+    // geometry, steps and total (D115 review, BLOCKER — routes previously
+    // began at a node up to 1.6 km from the guest and understated by that
+    // much).
     const opts = stops.length
-      ? [multiStopRoute(res.startId, [...stops, destPoiId])].filter((r): r is Route => !!r)
-      : network.alternatives(res.startId, dest.nodeId, 3);
+      ? [multiStopFrom(res.snap, [...stops, destPoiId])].filter((r): r is Route => !!r)
+      : network.alternativesFrom(res.snap, dest.nodeId, 3);
     if (!opts.length || opts[0].path.length < 2) {
       // No route can also mean the POI isn't bound to a road (e.g. the airstrip
       // until Callan adds its track) — don't tell a guest 10 km away they've
@@ -783,7 +853,15 @@ export default function App() {
   // Guest GPS onboarding states (display only — never change how position is used).
   const liveGps = source === "gps" && !showWelcome;
   const waitingForFix = liveGps && !gpsError && user == null;
-  const poorAccuracy = liveGps && user != null && accuracy != null && accuracy > GOOD_FIX_M;
+  // "Not proven good": UNKNOWN accuracy counts as poor — previously a null
+  // accuracy with a live position showed no status at all while routing
+  // correctly refused it, leaving the guest with silence (D115 review,
+  // MAJOR 3).
+  const poorAccuracy = liveGps && user != null && !(accuracy != null && accuracy <= GOOD_FIX_M);
+  // Guidance freeze indicator: driving on real GPS but the fix isn't good
+  // enough to advance guidance or re-route. The banner says so rather than
+  // letting instructions sit silently stale.
+  const guidancePaused = driving && liveGps && poorAccuracy;
 
   function navigateTo(p: Poi) {
     if (!navOn) return; // navigation held for Phase 1 — reserve.ts NAV_ENABLED + runtime navAuth
@@ -799,13 +877,17 @@ export default function App() {
 
   // Route through an ordered list of POIs (waypoints then destination), joining
   // the per-leg routes into one drive with a "Stop at …" step at each waypoint.
-  function multiStopRoute(fromNodeId: string, poiIds: string[]): Route | null {
+  // Multi-stop route from a GATED origin snap: the first leg is built with
+  // routeFrom (approach included), the rest are node-to-node POI legs.
+  function multiStopFrom(snap: RoadSnap, poiIds: string[]): Route | null {
     const wps = poiIds.map((id) => POIS.find((p) => p.id === id)).filter((p): p is Poi => !!p);
     if (!wps.length) return null;
-    const nodeSeq = [fromNodeId, ...wps.map((w) => w.nodeId)];
     const legs: Route[] = [];
-    for (let i = 0; i < nodeSeq.length - 1; i++) {
-      const leg = network.route(nodeSeq[i], nodeSeq[i + 1]);
+    const first = network.routeFrom(snap, wps[0].nodeId);
+    if (!first || first.path.length < 2) return null;
+    legs.push(first);
+    for (let i = 0; i < wps.length - 1; i++) {
+      const leg = network.route(wps[i].nodeId, wps[i + 1].nodeId);
       if (!leg || leg.path.length < 2) return null;
       legs.push(leg);
     }
@@ -827,34 +909,44 @@ export default function App() {
 
   // Apply a new stop order. Recomputes the live route from the current position
   // when already driving; otherwise the preview effect rebuilds from `stops`.
-  function replan(next: string[]) {
-    setStops(next);
-    if (driving && user && destPoiId) {
-      // Gated origin (D115): same rules as every other routing start. On
-      // refusal keep driving the current route — the stop order is stored,
-      // and the next good fix (via re-route or a fresh replan) applies it.
-      const destPoi = POIS.find((p) => p.id === destPoiId);
-      if (!destPoi) return;
-      const res = resolveRouteStart(
-        network, user, { source, accuracy: accuracyRef.current }, destPoi.nodeId,
-      );
-      if (!res.ok) {
-        setToast("Route will update when your GPS position settles");
-        return;
-      }
-      const r = multiStopRoute(res.startId, [...next, destPoiId]);
-      if (r && r.path.length >= 2) {
-        setActiveRoute(r);
-        setSimPath(r.path);
-        setSimDist(source === "gps" ? projectOnPath(user, r.path).along : 0);
-        if (source === "sim") setPlaying(true);
-      }
+  // Returns whether the change was APPLIED: while driving, the stop list only
+  // changes together with the active route — a displayed list the route
+  // ignores is a lie (D115 review, MAJOR 5).
+  function replan(next: string[]): boolean {
+    if (!driving) {
+      setStops(next); // preview effect rebuilds (itself gated)
+      return true;
     }
+    if (!user || !destPoiId) return false;
+    // Gated origin (D115): same rules as every other routing start. On
+    // refusal keep BOTH the current route and the current stop list.
+    const destPoi = POIS.find((p) => p.id === destPoiId);
+    if (!destPoi) return false;
+    const rf = routingFix();
+    const res = rf ? resolveOrigin(network, rf.pos, rf.fix, destPoi.nodeId) : null;
+    if (!rf || !res || !res.ok) {
+      setToast("Can't change stops right now — waiting for a good GPS fix");
+      return false;
+    }
+    const r = multiStopFrom(res.snap, [...next, destPoiId]);
+    if (!r || r.path.length < 2) {
+      setToast("No drivable route via those stops");
+      return false;
+    }
+    setStops(next);
+    setActiveRoute(r);
+    setSimPath(r.path);
+    setSimDist(source === "gps" ? projectOnPath(rf.pos, r.path).along : 0);
+    if (source === "sim") setPlaying(true);
+    return true;
   }
   function addStop(id: string) {
     if (!destPoiId || id === destPoiId || stops.includes(id)) return;
-    replan([...stops, id]);
-    setToast(`Stop added · ${POIS.find((p) => p.id === id)?.name ?? ""}`);
+    // Only claim success when the change actually took — the old code toasted
+    // "Stop added" over replan's refusal (D115 review, MAJOR 5).
+    if (replan([...stops, id])) {
+      setToast(`Stop added · ${POIS.find((p) => p.id === id)?.name ?? ""}`);
+    }
   }
   function removeStop(id: string) {
     replan(stops.filter((s) => s !== id));
@@ -932,16 +1024,18 @@ export default function App() {
     setOpenPoiId(null);
     setFollow(true);
     // Gated origin (D115): tour legs route from the live position too.
-    const res = resolveRouteStart(network, user, { source, accuracy: accuracyRef.current }, poi.nodeId);
+    const rf = routingFix();
+    if (!rf) { setToast("Waiting for your location…"); return; }
+    const res = resolveOrigin(network, rf.pos, rf.fix, poi.nodeId);
     if (!res.ok && res.reason !== "off-network" && res.reason !== "no-route") {
       // Fix-quality problems: wait, don't guess. (Sim tours are exact and
       // never land here.)
       setToast(originFailureMessage(res.reason, poi.name));
       return;
     }
-    const r = res.ok ? network.route(res.startId, poi.nodeId) : null;
+    const r = res.ok ? network.routeFrom(res.snap, poi.nodeId) : null;
     if (!r || r.path.length < 2) {
-      if (distanceMeters(user, poiWorld(poi)) > 250) {
+      if (distanceMeters(rf.pos, poiWorld(poi)) > 250) {
         // Unroutable stop (POI not bound to a road) — say so, don't fake arrival.
         setToast(`No drivable route to ${poi.name} yet`);
         return;
@@ -956,9 +1050,17 @@ export default function App() {
     setDriving(true);
     setActiveRoute(r);
     setSimPath(r.path);
-    setSimDist(0);
-    setSource("sim");
-    setPlaying(true);
+    // A REAL guest drives tour legs with their real GPS — the old code forced
+    // setSource("sim") and auto-drove the dot along the route, i.e. simulated
+    // movement reachable outside the demo gate (D115 review, MAJOR 6). Sim
+    // stays sim (demo behaviour unchanged); GPS guests get live guidance,
+    // progress and re-routing exactly like a normal drive.
+    if (source === "gps") {
+      setSimDist(projectOnPath(rf.pos, r.path).along);
+    } else {
+      setSimDist(0);
+      setPlaying(true);
+    }
   }
   function startTour(t: Tour) {
     if (!navOn) return; // tours drive the nav/sim engine — held with navigation
@@ -1153,6 +1255,14 @@ export default function App() {
           {/* Live navigation banner */}
           {navOn && destPoi && banner && (
             <div className="nav-banner">
+              {/* Guidance freeze (D115): while the GPS fix is poor/unknown the
+                  progress, next-turn and re-routing are all deliberately held —
+                  say so, or the instructions just look silently stuck. */}
+              {guidancePaused && (
+                <div className="nav-paused" role="status">
+                  ⏸ Guidance paused — improving your GPS fix. Instructions resume automatically.
+                </div>
+              )}
               <div className="nav-step">
                 <div className="nav-maneuver">{banner.icon}</div>
                 <div className="nav-text">
@@ -1341,6 +1451,22 @@ export default function App() {
                       // first REAL fix starts clean — otherwise the stale sim
                       // pose lingers on the dot and can fire a bogus
                       // boundary alert when the real fix lands elsewhere.
+                      // Any ACTIVE sim drive/tour ends too: keeping a simulated
+                      // route "active" against a real GPS position leaves stale
+                      // guidance running until an off-route fix happens to
+                      // replace it (D115 review, MAJOR 3).
+                      if (driving || tour || destPoiId) {
+                        drivingNav.current = false;
+                        tourDriving.current = false;
+                        setTour(null);
+                        setTourAtStop(false);
+                        setDriving(false);
+                        setActiveRoute(null);
+                        setDestPoiId(null);
+                        setStops([]);
+                        setPlaying(false);
+                        setToast("Demo drive ended — switching to your GPS");
+                      }
                       setSource("gps");
                       setUser(null);
                       setHeading(null);

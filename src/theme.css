@@ -226,6 +226,15 @@ body {
 }
 .nav-step { order: 1; }
 .nav-actions { order: 2; }
+/* Guidance freeze notice (D115): full-width strip above the instruction while
+   a poor/unknown GPS fix holds progress + re-routing. */
+.nav-paused {
+  order: 0; flex-basis: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
 /* Route choices wrap onto their own row under the step + actions. */
 .nav-routes { order: 4; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
 /* Stops itinerary — reorderable/removable chips on their own row. */

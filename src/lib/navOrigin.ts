@@ -48,6 +48,7 @@ export const OFF_NETWORK_M = 2000;
 /** The slice of RoadNetwork this module needs (the app passes its lazy wrapper). */
 export interface RoutingNet {
   route(startId: string, goalId: string): Route | null;
+  routeFrom(snap: RoadSnap, destId: string): Route | null;
   nearestRoadPoints(p: LatLng, toleranceM: number): RoadSnap[];
 }
 
@@ -85,20 +86,30 @@ export function gatedOriginCandidates(
   fix: Fix,
   destNodeId: string,
 ): OriginCandidates {
-  if (fix.source === "gps" && !(fix.accuracy != null && fix.accuracy <= GOOD_FIX_M)) {
+  // "Not proven good": accuracy must be present, non-negative and within the
+  // threshold. Negative accuracy is malformed provider output — the App's
+  // setter sanitises it, but the shared gate must not depend on callers
+  // (D115 review, minor 2).
+  if (fix.source === "gps" && !(fix.accuracy != null && fix.accuracy >= 0 && fix.accuracy <= GOOD_FIX_M)) {
     return { ok: false, reason: "poor-fix" };
   }
   const candidates = net.nearestRoadPoints(user, SNAP_AMBIGUITY_M);
   if (candidates.length === 0 || candidates[0].gapM > OFF_NETWORK_M) {
     return { ok: false, reason: "off-network" };
   }
-  const perEdge: { snap: RoadSnap; bestEndId: string; totalM: number }[] = [];
+  // Blocker clearance for EVERY plausible candidate first, THEN routability —
+  // interleaved checks made the typed reason depend on candidate order
+  // (D115 review, minor 1). "blocked" must win: it is the safety-critical
+  // refusal, and tour flows treat "no-route" as a soft fallback.
   for (const snap of candidates) {
     if (
       BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, snap.point, s[0], s[1]) < BLOCKER_CLEARANCE_M)
     ) {
       return { ok: false, reason: "blocked" };
     }
+  }
+  const perEdge: { snap: RoadSnap; bestEndId: string; totalM: number }[] = [];
+  for (const snap of candidates) {
     let best: { endId: string; totalM: number } | null = null;
     for (const [endId, alongM] of [
       [snap.aId, snap.alongToAM],
@@ -120,17 +131,26 @@ export function gatedOriginCandidates(
 }
 
 export type OriginResolution =
-  | { ok: true; startId: string; snap: RoadSnap; totalM: number }
+  | { ok: true; snap: RoadSnap; totalM: number }
   | { ok: false; reason: OriginFailure };
 
 /**
- * Resolve a route START for navigation: all four rules enforced. Returns the
- * best endpoint of the best candidate edge only when every plausible edge
- * agrees (within ROUTE_AGREE_M) about the drive — otherwise refuses, because
- * guiding a guest from the wrong road is exactly the failure the popup's
- * review rounds kept finding.
+ * Resolve the ORIGIN for navigation: all four rules enforced, and when every
+ * plausible edge agrees (within ROUTE_AGREE_M) about the drive, the
+ * **NEAREST** edge's snap is returned — the road the guest is actually on —
+ * for the caller to route with `routeFrom`/`alternativesFrom` so the
+ * approach leg is part of the route.
+ *
+ * Two D115-review corrections live here:
+ * - Nearest edge, NOT the globally cheapest candidate: picking the smallest
+ *   total let a 57.9 m-away parallel edge beat the edge under the wheels and
+ *   dropped the guest's actual first road from guidance (MAJOR 2). Within the
+ *   agreement band the totals are equivalent; the geometry is not.
+ * - The snap (with its partial-edge geometry) is the product — returning a
+ *   bare start node id let every consumer route from a node up to 1.6 km
+ *   away and silently drop the approach (BLOCKER).
  */
-export function resolveRouteStart(
+export function resolveOrigin(
   net: RoutingNet,
   user: LatLng,
   fix: Fix,
@@ -140,14 +160,14 @@ export function resolveRouteStart(
   if (!g.ok) return g;
   let min = Infinity;
   let max = -Infinity;
-  let best: { snap: RoadSnap; bestEndId: string; totalM: number } | null = null;
   for (const c of g.perEdge) {
     min = Math.min(min, c.totalM);
     max = Math.max(max, c.totalM);
-    if (!best || c.totalM < best.totalM) best = c;
   }
   if (max - min > ROUTE_AGREE_M) return { ok: false, reason: "ambiguous" };
-  return { ok: true, startId: best!.bestEndId, snap: best!.snap, totalM: best!.totalM };
+  // gatedOriginCandidates preserves nearestRoadPoints' nearest-first order.
+  const nearest = g.perEdge[0];
+  return { ok: true, snap: nearest.snap, totalM: nearest.totalM };
 }
 
 /** Honest guest-facing line for each refusal, shared so wording stays consistent. */
