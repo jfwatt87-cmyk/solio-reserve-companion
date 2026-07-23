@@ -4,12 +4,10 @@ import coverLogo from "./assets/solio-logo.png";
 import { createGeoReference, pixelWorld, MAP_MARGIN, NAV_ENABLED } from "./data/reserve";
 import { insideReserveBuffered } from "./data/boundary";
 import { createRoadNetwork, NODE_PIXEL } from "./data/roadSource";
-import { BLOCKER_SEGMENTS } from "./data/blockers";
 import { POIS, poiWorld, type Poi } from "./data/pois";
 import { TOURS, type Tour } from "./data/tours";
 import {
   distanceMeters,
-  segmentsMinMeters,
   destinationPoint,
   pointToPathMeters,
   projectOnPath,
@@ -17,6 +15,13 @@ import {
   type LatLng,
 } from "./lib/geo";
 import { stepInstruction, type Route, type RouteStep } from "./lib/routing";
+import {
+  GOOD_FIX_M,
+  ROUTE_AGREE_M,
+  gatedOriginCandidates,
+  resolveRouteStart,
+  originFailureMessage,
+} from "./lib/navOrigin";
 import { pathLength, poseAlong } from "./lib/sim";
 import { precacheTiles, tilesAlreadyCached, verifyTilesCached, invalidateTileCache, requestPersistentStorage } from "./lib/precache";
 import { navAuthCached, refreshNavAuth } from "./lib/navAuth";
@@ -35,7 +40,8 @@ type NavigatorStandalone = Navigator & { standalone?: boolean };
 
 const SPEED_MPS = 15; // simulated game-drive speed (~54 km/h peak on tracks)
 const ETA_MPS = 7;    // display-only ETA speed (~25 km/h — realistic on game-drive tracks)
-const GOOD_FIX_M = 50; // accuracy threshold: below this we treat the GPS fix as precise
+// GOOD_FIX_M (the ≤50 m precise-fix threshold) now lives in lib/navOrigin —
+// the shared gate every routing consumer goes through (D115).
 // A looping demo patrol through network nodes (see data/roadSource.ts). Each leg
 // is routed along the traced roads, so the demo dot drives the drawn tracks.
 const PATROL = ["gate", "j1", "jw", "j2", "j3", "j4", "naribo", "j5", "choroa", "j2", "j1", "gate"];
@@ -64,8 +70,9 @@ export default function App() {
     return {
       route: (...args: Parameters<Net["route"]>) => get().route(...args),
       alternatives: (...args: Parameters<Net["alternatives"]>) => get().alternatives(...args),
-      nearestNode: (...args: Parameters<Net["nearestNode"]>) => get().nearestNode(...args),
-      nearestRoadPoint: (...args: Parameters<Net["nearestRoadPoint"]>) => get().nearestRoadPoint(...args),
+      // Raw nearestNode is deliberately NOT exposed (D115): every live-position
+      // snap must go through lib/navOrigin's gated resolution. Position-free
+      // routing (sim patrol legs, POI-to-POI) uses node ids directly.
       nearestRoadPoints: (...args: Parameters<Net["nearestRoadPoints"]>) => get().nearestRoadPoints(...args),
     };
   }, []);
@@ -132,6 +139,9 @@ export default function App() {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const userRef = useRef(user);
   userRef.current = user;
+  // Accuracy mirrored into a ref for effects that must read the CURRENT fix
+  // quality without re-running on every GPS tick (route preview, replan).
+  const accuracyRef = useRef<number | null>(null);
 
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [openPoiId, setOpenPoiId] = useState<string | null>(
@@ -529,9 +539,15 @@ export default function App() {
     if (Date.now() - lastReroute.current < 2500) return;
     const dest = POIS.find((p) => p.id === destPoiId);
     if (!dest) return;
-    const start = network.nearestNode(user);
-    const r = network.route(start.id, dest.nodeId);
+    // Gated origin (D115): never re-route off a poor/unknown-accuracy fix or
+    // an ambiguous wrong-edge snap — acting on a bad fix is how a guest gets
+    // re-routed onto a road they're not on. Keep the current route and let
+    // the next good fix re-trigger (deviation persists, throttle allows a
+    // retry every 2.5 s). Classic sat-nav behaviour: ignore bad fixes.
+    const res = resolveRouteStart(network, user, { source, accuracy: accuracyRef.current }, dest.nodeId);
     lastReroute.current = Date.now();
+    if (!res.ok) return;
+    const r = network.route(res.startId, dest.nodeId);
     detouring.current = false;
     if (!r || r.path.length < 2) { setPlaying(true); return; }
     setActiveRoute(r);
@@ -539,7 +555,7 @@ export default function App() {
     setSimDist(0);
     setPlaying(true);
     setToast("Off route — recalculating…");
-  }, [user, driving, destPoiId, activeRoute, network]);
+  }, [user, driving, destPoiId, activeRoute, network, source]);
 
   // ---- Device GPS ----------------------------------------------------------
   // Held until the welcome is dismissed so the browser's permission prompt is a
@@ -561,9 +577,10 @@ export default function App() {
         // OPEN through the accuracy gate (NaN > 50 and NaN == null are both
         // false). Malformed/emulated providers → null → gate fails closed
         // (gpt-5.6-sol round 4). Negative accuracy is equally malformed.
-        setAccuracy(
-          Number.isFinite(p.coords.accuracy) && p.coords.accuracy >= 0 ? p.coords.accuracy : null,
-        );
+        const fixAcc =
+          Number.isFinite(p.coords.accuracy) && p.coords.accuracy >= 0 ? p.coords.accuracy : null;
+        accuracyRef.current = fixAcc;
+        setAccuracy(fixAcc);
         setUser({ lat: p.coords.latitude, lng: p.coords.longitude });
         if (p.coords.heading != null && !Number.isNaN(p.coords.heading)) {
           setHeading(p.coords.heading);
@@ -572,7 +589,14 @@ export default function App() {
       (err) => setGpsError(friendlyGpsError(err)),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
-    return () => navigator.geolocation.clearWatch(id);
+    return () => {
+      navigator.geolocation.clearWatch(id);
+      // No active watch = no known fix quality. Leaving a stale "good"
+      // accuracy behind would let the routing gate pass on old information
+      // if GPS is re-entered later.
+      accuracyRef.current = null;
+      setAccuracy(null);
+    };
   }, [source, showWelcome]);
 
   // Notify once when a live guest crosses the reserve boundary (either way). The
@@ -608,71 +632,26 @@ export default function App() {
   const openPoiDriveM = useMemo(() => {
     if (!openPoi || !user) return null;
     try {
-      // Snap to the nearest point ON a road edge, not the nearest graph NODE.
-      // Node-snapping understated real drives by kilometres when the guest sat
-      // mid-edge on a long road but straight-line-nearer to some other road's
-      // junction (post-release audit 2026-07-22: 2.3 km shown vs 9.1 km real
-      // at the g190–g147 midpoint).
-      //
-      // AND the nearest edge is only a guess: with ordinary GPS error the fix
-      // can land nearer a parallel road than the one the guest is driving
-      // (re-review 2026-07-22: a 30 m error — inside our own 50 m good-fix
-      // threshold — picked the wrong edge and understated a drive by 6.4 km).
-      // So consider EVERY edge within SNAP_AMBIGUITY_M of the nearest as
-      // plausibly occupied; each candidate's drive is routed from both of its
-      // endpoints plus the along-edge distance. If the candidates disagree by
-      // more than DRIVE_AGREE_M we genuinely don't know which road the guest
-      // is on — show the direct readout rather than a number that could be
-      // kilometres short. When they agree, show the LONGEST: within the
-      // tolerance band, over-stating is the safe direction ("approx" is the
-      // label), under-stating is the field-safety defect.
-      // The ambiguity band below is calibrated for fixes with ≤GOOD_FIX_M
-      // error — so ENFORCE that model (gpt-5.6-sol round 3): a 100 m fix can
-      // put every plausible-looking candidate on the wrong side of the
-      // reserve and understate a 4.6 km drive as 40 m. Real GPS with poor or
-      // unknown accuracy gets the labelled direct readout, nothing routed.
-      // (Sim positions are exact by construction — no accuracy to enforce.)
-      // Phrased as "not proven good" rather than "proven bad" so NaN — or any
-      // other non-comparable value that slips past the setter — fails CLOSED
-      // (gpt-5.6-sol round 4: both `NaN == null` and `NaN > 50` are false).
-      if (source === "gps" && !(accuracy != null && accuracy <= GOOD_FIX_M)) return null;
-      const SNAP_AMBIGUITY_M = 75; // GPS error envelope (good fix ≤50 m) + projection slop
-      const DRIVE_AGREE_M = 500; // candidates further apart than this = ambiguous
-      const candidates = network.nearestRoadPoints(user, SNAP_AMBIGUITY_M);
-      if (candidates.length === 0 || candidates[0].gapM > 2000) return null;
+      // All four safety rules (accuracy gate · edge projection · plausible-
+      // candidate set · blocker clearance) live in lib/navOrigin — the SAME
+      // implementation navigation uses (D115), so the popup and nav can never
+      // drift apart again. History of why each rule exists is documented
+      // there (D105–D108: three adversarial review rounds on this one number).
+      // Any failure → null → the labelled direct readout. Only the DISPLAY
+      // policy stays here.
+      const g = gatedOriginCandidates(network, user, { source, accuracy }, openPoi.nodeId);
+      if (!g.ok) return null;
       let minTotal = Infinity;
       let maxTotal = -Infinity;
-      for (const snap of candidates) {
-        // The user->road connector is a straight line the road graph never
-        // vetted: a guest beside a cut crossing — private (S18/S20) or
-        // permission-unknown (S05/S06/S16/S21/S22) — can snap to the FAR
-        // side, and the "drive distance" would then assume a crossing the
-        // graph forbids and understate (gpt-5.6-sol R8+R9). If ANY plausible
-        // candidate's connector passes near a cut segment, the safe answer
-        // is the direct readout.
-        if (BLOCKER_SEGMENTS.some((s) => segmentsMinMeters(user, snap.point, s[0], s[1]) < 25)) {
-          return null;
-        }
-        let bestForEdge: number | null = null;
-        for (const [endId, alongM] of [
-          [snap.aId, snap.alongToAM],
-          [snap.bId, snap.alongToBM],
-        ] as const) {
-          const r = network.route(endId, openPoi.nodeId);
-          if (!r) continue; // endpoint unreachable — try the other one
-          // r.totalM is 0 when the POI IS this endpoint: the along-edge
-          // distance already covers the drive, so an empty path is fine.
-          const total = snap.gapM + alongM + r.totalM;
-          if (bestForEdge === null || total < bestForEdge) bestForEdge = total;
-        }
-        // A plausible edge with NO route to the POI means we cannot bound the
-        // real drive — fail safe to the direct readout.
-        if (bestForEdge === null) return null;
-        minTotal = Math.min(minTotal, bestForEdge);
-        maxTotal = Math.max(maxTotal, bestForEdge);
+      for (const c of g.perEdge) {
+        minTotal = Math.min(minTotal, c.totalM);
+        maxTotal = Math.max(maxTotal, c.totalM);
       }
-      if (maxTotal - minTotal > DRIVE_AGREE_M) return null;
-      // Within the agreement band any candidate is ≤DRIVE_AGREE_M from the
+      // Candidates disagreeing by more than the band = we don't know which
+      // road the guest is on — direct readout, never a number that could be
+      // kilometres short (gpt-5.6-sol round 2).
+      if (maxTotal - minTotal > ROUTE_AGREE_M) return null;
+      // Within the agreement band any candidate is ≤ROUTE_AGREE_M from the
       // truth, so the SAFETY bound is identical whichever we show. Long
       // drives show the LONGEST (overstating is the safe direction); short
       // drives show the SHORTEST — at walking distance the max reads absurd
@@ -707,11 +686,28 @@ export default function App() {
     const dest = POIS.find((p) => p.id === destPoiId);
     const from = userRef.current;
     if (!dest || !from) return;
-    const start = network.nearestNode(from);
+    // Gated origin (D115): the start snap goes through the same accuracy /
+    // edge-projection / ambiguity / blocker rules as the popup's drive
+    // distance — previewing a route from the wrong road is the same defect
+    // as displaying the wrong number, with turn-by-turn consequences.
+    // accuracyRef (not state) so this effect doesn't re-run per GPS tick;
+    // on refusal the destination is cleared, so the guest simply taps again
+    // once their fix settles.
+    const res = resolveRouteStart(network, from, { source, accuracy: accuracyRef.current }, dest.nodeId);
+    if (!res.ok) {
+      const near = distanceMeters(from, poiWorld(dest)) < 250;
+      setToast(near && (res.reason === "off-network" || res.reason === "no-route")
+        ? `You're already at ${dest.name}`
+        : originFailureMessage(res.reason, dest.name));
+      setDestPoiId(null);
+      setStops([]);
+      setRouteOptions([]);
+      return;
+    }
     // With stops, offer the single via-route; without, offer alternatives.
     const opts = stops.length
-      ? [multiStopRoute(start.id, [...stops, destPoiId])].filter((r): r is Route => !!r)
-      : network.alternatives(start.id, dest.nodeId, 3);
+      ? [multiStopRoute(res.startId, [...stops, destPoiId])].filter((r): r is Route => !!r)
+      : network.alternatives(res.startId, dest.nodeId, 3);
     if (!opts.length || opts[0].path.length < 2) {
       // No route can also mean the POI isn't bound to a road (e.g. the airstrip
       // until Callan adds its track) — don't tell a guest 10 km away they've
@@ -725,7 +721,7 @@ export default function App() {
     }
     setRouteOptions(opts);
     setSelectedRouteIdx(0);
-  }, [destPoiId, driving, network, stops]);
+  }, [destPoiId, driving, network, stops, source]);
 
   // The picked preview route, and the non-selected alternatives (drawn dimmed).
   const routePreview: Route | null = useMemo(
@@ -834,7 +830,19 @@ export default function App() {
   function replan(next: string[]) {
     setStops(next);
     if (driving && user && destPoiId) {
-      const r = multiStopRoute(network.nearestNode(user).id, [...next, destPoiId]);
+      // Gated origin (D115): same rules as every other routing start. On
+      // refusal keep driving the current route — the stop order is stored,
+      // and the next good fix (via re-route or a fresh replan) applies it.
+      const destPoi = POIS.find((p) => p.id === destPoiId);
+      if (!destPoi) return;
+      const res = resolveRouteStart(
+        network, user, { source, accuracy: accuracyRef.current }, destPoi.nodeId,
+      );
+      if (!res.ok) {
+        setToast("Route will update when your GPS position settles");
+        return;
+      }
+      const r = multiStopRoute(res.startId, [...next, destPoiId]);
       if (r && r.path.length >= 2) {
         setActiveRoute(r);
         setSimPath(r.path);
@@ -923,8 +931,15 @@ export default function App() {
     setSelectedPoiId(poi.id);
     setOpenPoiId(null);
     setFollow(true);
-    const start = network.nearestNode(user);
-    const r = network.route(start.id, poi.nodeId);
+    // Gated origin (D115): tour legs route from the live position too.
+    const res = resolveRouteStart(network, user, { source, accuracy: accuracyRef.current }, poi.nodeId);
+    if (!res.ok && res.reason !== "off-network" && res.reason !== "no-route") {
+      // Fix-quality problems: wait, don't guess. (Sim tours are exact and
+      // never land here.)
+      setToast(originFailureMessage(res.reason, poi.name));
+      return;
+    }
+    const r = res.ok ? network.route(res.startId, poi.nodeId) : null;
     if (!r || r.path.length < 2) {
       if (distanceMeters(user, poiWorld(poi)) > 250) {
         // Unroutable stop (POI not bound to a road) — say so, don't fake arrival.
