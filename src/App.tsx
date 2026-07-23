@@ -155,6 +155,13 @@ export default function App() {
   // MAJOR 4): the error callback and the watch teardown null it, and
   // `routingFix()` refuses anything older than FIX_FRESH_MS.
   const fixRef = useRef<{ pos: LatLng; accuracy: number | null; at: number } | null>(null);
+  // Timer that expires the RENDERED fix state when the watch goes silent past
+  // FIX_FRESH_MS. routingFix() enforces freshness at interaction time, but
+  // nothing re-rendered when the deadline passed: `accuracy` stayed at its
+  // last good value, so the paused strip never appeared and the popup's memo
+  // kept a routed number indefinitely (round-3 review, MAJOR — original
+  // finding 4 re-rejected). Re-armed on every success callback.
+  const fixStaleTimer = useRef<number | null>(null);
 
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [openPoiId, setOpenPoiId] = useState<string | null>(
@@ -501,10 +508,15 @@ export default function App() {
   useEffect(() => {
     if (!drivingNav.current || !activeRoute || detouring.current) return;
     const dest = POIS.find((p) => p.id === destPoiId);
+    // GPS arrival only off a GATED fix: arrival tears down the route, the
+    // destination and the stop list — terminal actions a poor fix must never
+    // trigger (round-3 review, MAJOR: a 500 m fix near the POI "arrived" a
+    // guest who was nowhere near it).
+    const gpsPos = source === "gps" ? goodGpsPos() : null;
     const arrived =
       source === "sim"
         ? simPath.length >= 2 && simDist >= pathLength(simPath)
-        : !!(user && dest && distanceMeters(user, poiWorld(dest)) < ARRIVE_M);
+        : !!(gpsPos && dest && distanceMeters(gpsPos, poiWorld(dest)) < ARRIVE_M);
     if (!arrived) return;
     drivingNav.current = false;
     setDriving(false);
@@ -542,9 +554,9 @@ export default function App() {
   // (`guidancePaused` below).
   useEffect(() => {
     if (source !== "gps" || !driving || !activeRoute || !user) return;
-    const rf = routingFix();
-    if (!rf || !(rf.fix.accuracy != null && rf.fix.accuracy <= GOOD_FIX_M)) return;
-    setSimDist(projectOnPath(rf.pos, activeRoute.path).along);
+    const pos = goodGpsPos();
+    if (!pos) return;
+    setSimDist(projectOnPath(pos, activeRoute.path).along);
   }, [source, driving, activeRoute, user]);
 
   // ---- Live re-routing -----------------------------------------------------
@@ -610,6 +622,16 @@ export default function App() {
           Number.isFinite(p.coords.accuracy) && p.coords.accuracy >= 0 ? p.coords.accuracy : null;
         const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
         fixRef.current = { pos, accuracy: fixAcc, at: Date.now() };
+        // Re-arm the staleness deadline: if no further callback (success OR
+        // error) lands within FIX_FRESH_MS — some platforms simply go silent
+        // in a tunnel — expire the rendered state to match what routingFix()
+        // already refuses: accuracy becomes unknown, the status line/paused
+        // strip appear, and the popup memo drops its routed number.
+        if (fixStaleTimer.current != null) clearTimeout(fixStaleTimer.current);
+        fixStaleTimer.current = window.setTimeout(() => {
+          fixRef.current = null;
+          setAccuracy(null);
+        }, FIX_FRESH_MS);
         setAccuracy(fixAcc);
         setUser(pos);
         if (p.coords.heading != null && !Number.isNaN(p.coords.heading)) {
@@ -623,6 +645,8 @@ export default function App() {
         // (D115 review, MAJOR 4). The map dot keeps the last position for
         // display; routing does not. Accuracy state is nulled too so the
         // status line and the popup's memo react (unknown = poor).
+        if (fixStaleTimer.current != null) clearTimeout(fixStaleTimer.current);
+        fixStaleTimer.current = null;
         fixRef.current = null;
         setAccuracy(null);
         setGpsError(friendlyGpsError(err));
@@ -634,6 +658,8 @@ export default function App() {
       // No active watch = no known fix. Leaving a stale "good" snapshot
       // behind would let the routing gate pass on old information if GPS is
       // re-entered later.
+      if (fixStaleTimer.current != null) clearTimeout(fixStaleTimer.current);
+      fixStaleTimer.current = null;
       fixRef.current = null;
       setAccuracy(null);
     };
@@ -657,6 +683,18 @@ export default function App() {
     // messages can reference it; the null accuracy guarantees refusal.
     const pos = userRef.current;
     return pos ? { pos, fix: { source: "gps", accuracy: null } } : null;
+  }
+
+  // The live GPS position when — and only when — the atomic fix passes the
+  // same accuracy gate navOrigin enforces; null otherwise. The SOLE basis for
+  // starting, advancing or ENDING guidance on real GPS: raw `user` here let a
+  // 500 m-accuracy fix that jumped near the destination initialise drive
+  // progress mid-route, or instantly "arrive" and tear the whole drive down
+  // (round-3 review, MAJOR — original finding 3 re-rejected).
+  function goodGpsPos(): LatLng | null {
+    const rf = routingFix();
+    if (!rf || rf.fix.source !== "gps") return null;
+    return rf.fix.accuracy != null && rf.fix.accuracy <= GOOD_FIX_M ? rf.pos : null;
   }
 
   // Notify once when a live guest crosses the reserve boundary (either way). The
@@ -992,9 +1030,14 @@ export default function App() {
     setSimPath(r.path);
     setFollow(true);
     if (source === "gps") {
-      // Navigate with the real device position — progress + arrival come from GPS,
-      // and the live re-router recomputes if you actually drive off the route.
-      setSimDist(user ? projectOnPath(user, r.path).along : 0);
+      // Navigate with the real device position — progress + arrival come from GPS.
+      // Initial progress only from a GATED fix: projecting a poor fix onto the
+      // route could start guidance from a fictional position (round-3 review,
+      // MAJOR). On a poor fix, start at the route's origin — the route itself
+      // begins at the guest's last gated snap — and the gated progress effect
+      // takes over on the next good fix (banner shows "guidance paused" until).
+      const pos = goodGpsPos();
+      setSimDist(pos ? projectOnPath(pos, r.path).along : 0);
     } else {
       setSimDist(0);
       setPlaying(true);
