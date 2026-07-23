@@ -162,7 +162,9 @@ def main() -> None:
                            "reason=private-access — the Marriotts private crossings (S18/S20): "
                            "real, and closed to guest through-routing at Solio's request. JW "
                            "Marriott itself remains reachable. "
-                           "The first two reopen the moment Solio answers; the third does not. "
+                           "reason=not-a-crossing — established there is no crossing here at all "
+                           "(S06: the map mark is a toilet label, not a river crossing). "
+                           "The first two reopen the moment Solio answers; the others do not. "
                            "A crossing NOT listed here is not blocked by this decision layer — "
                            "which is NOT the same as asserting its geometry is present and "
                            "routable in the network. Generated from crossing_decisions.json."),

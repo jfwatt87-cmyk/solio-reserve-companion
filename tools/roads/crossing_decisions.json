@@ -1,402 +1,401 @@
 {
-  "_README": [
-    "SINGLE SOURCE OF TRUTH for every crossing-site decision. Authored by hand; nothing else is.",
-    "",
-    "build_blockers.py generates the blocker files, the joins file's decision fields and the export",
-    "description FROM THIS. test_decision_consistency.py fails if any artifact drifts from it.",
-    "It exists because on 2026-07-14 the same decision was written into five places by hand, they",
-    "disagreed within a day, and a client deliverable ended up asserting something false (D87 F7).",
-    "",
-    "TWO INDEPENDENT AXES. Each is authored on its own; NEITHER is derived from the other.",
-    "",
-    "  crossing_exists  true | false | \"unknown\"   is there a real crossing here?",
-    "  guest_routable   true | false | \"unknown\"   may a guest drive through it?",
-    "",
-    "D89 claimed to split these and did not: both were still computed from one `status` field, so",
-    "the three legal combinations were the only ones expressible (confirmed=yes/yes, private=yes/no,",
-    "unconfirmed=no/no) and `load_manifest` REJECTED anything else. The case we actually had - S06,",
-    "'the crossing exists, we don't know if guests may use it' - was literally unrepresentable, so",
-    "it got rounded to 'confirmed' and the site went routable on an inference (D90 F2). Naming two",
-    "booleans is not separating them. These are now stored, not derived.",
-    "",
-    "\"unknown\" is a first-class answer and the honest one far more often than not. It is NOT",
-    "false: `crossing_exists:\"unknown\"` says we have not established a crossing, not that we",
-    "established there is none.",
-    "",
-    "ROUTING: a site is cut unless guest_routable is exactly true. Both false and \"unknown\" cut.",
-    "",
-    "closure:",
-    "  open    - cut pending an answer. If Solio answers, unblocking is the CORRECT response.",
-    "  settled - routable on evidence, or closed by agreement. Does not move on 'confirmation'.",
-    "",
-    "routable_basis - REQUIRED when guest_routable is true, forbidden otherwise:",
-    "  'recorded-drive' - a GPX drive crossed the river here. CHECKED against the joins file's",
-    "                     evidence: claiming this without crossing_confirmed evidence FAILS the",
-    "                     build. It was a free-text label until someone set S06 to 'recorded-drive'",
-    "                     with zero recorded crossings and the whole suite stayed green (D90 F2).",
-    "  'quote'          - Solio's words state DRIVABILITY.",
-    "  'inference'      - we concluded it. Recording an inference does not make it evidence: it",
-    "                     is not a basis for routing a guest, only for asking a better question.",
-    "An inference is never laundered into a quote. If it is an inference, `inference` says why.",
-    "",
-    "RULE (D79, and the one I broke within the hour - D87 F1, and again on S06 - D90 F2): naming a",
-    "place is NOT confirming you can drive through it. 'It's the Orphanage Road' identifies a road.",
-    "It does not say the river join we inferred there is a real crossing a guest may drive. Only set",
-    "guest_routable=true on a recorded drive crossing, or words that speak to DRIVABILITY, not",
-    "identity. Three review rounds found this same over-read, each time in a different disguise.",
-    "",
-    "quote: Callan's own words, verbatim. If a field cannot be traced to a quote or to recorded",
-    "evidence, it is an inference - say so in `inference`, do not launder it into an axis."
-  ],
-  "_provenance": {
-    "source": "Callan Day (Solio reserve manager), WhatsApp 2026-07-14",
-    "asked_by": "James",
-    "context": "Reply to the 2026-07-09 road-data pack: 7 unconfirmed crossing sites of 22.",
-    "also_said": "Happy with the Solio Roads V2 File"
+ "_README": [
+  "SINGLE SOURCE OF TRUTH for every crossing-site decision. Authored by hand; nothing else is.",
+  "",
+  "build_blockers.py generates the blocker files, the joins file's decision fields and the export",
+  "description FROM THIS. test_decision_consistency.py fails if any artifact drifts from it.",
+  "It exists because on 2026-07-14 the same decision was written into five places by hand, they",
+  "disagreed within a day, and a client deliverable ended up asserting something false (D87 F7).",
+  "",
+  "TWO INDEPENDENT AXES. Each is authored on its own; NEITHER is derived from the other.",
+  "",
+  "  crossing_exists  true | false | \"unknown\"   is there a real crossing here?",
+  "  guest_routable   true | false | \"unknown\"   may a guest drive through it?",
+  "",
+  "D89 claimed to split these and did not: both were still computed from one `status` field, so",
+  "the three legal combinations were the only ones expressible (confirmed=yes/yes, private=yes/no,",
+  "unconfirmed=no/no) and `load_manifest` REJECTED anything else. The case we actually had - S06,",
+  "'the crossing exists, we don't know if guests may use it' - was literally unrepresentable, so",
+  "it got rounded to 'confirmed' and the site went routable on an inference (D90 F2). Naming two",
+  "booleans is not separating them. These are now stored, not derived.",
+  "",
+  "\"unknown\" is a first-class answer and the honest one far more often than not. It is NOT",
+  "false: `crossing_exists:\"unknown\"` says we have not established a crossing, not that we",
+  "established there is none.",
+  "",
+  "ROUTING: a site is cut unless guest_routable is exactly true. Both false and \"unknown\" cut.",
+  "",
+  "closure:",
+  "  open    - cut pending an answer. If Solio answers, unblocking is the CORRECT response.",
+  "  settled - routable on evidence, or closed by agreement. Does not move on 'confirmation'.",
+  "",
+  "routable_basis - REQUIRED when guest_routable is true, forbidden otherwise:",
+  "  'recorded-drive' - a GPX drive crossed the river here. CHECKED against the joins file's",
+  "                     evidence: claiming this without crossing_confirmed evidence FAILS the",
+  "                     build. It was a free-text label until someone set S06 to 'recorded-drive'",
+  "                     with zero recorded crossings and the whole suite stayed green (D90 F2).",
+  "  'quote'          - Solio's words state DRIVABILITY.",
+  "  'inference'      - we concluded it. Recording an inference does not make it evidence: it",
+  "                     is not a basis for routing a guest, only for asking a better question.",
+  "An inference is never laundered into a quote. If it is an inference, `inference` says why.",
+  "",
+  "RULE (D79, and the one I broke within the hour - D87 F1, and again on S06 - D90 F2): naming a",
+  "place is NOT confirming you can drive through it. 'It's the Orphanage Road' identifies a road.",
+  "It does not say the river join we inferred there is a real crossing a guest may drive. Only set",
+  "guest_routable=true on a recorded drive crossing, or words that speak to DRIVABILITY, not",
+  "identity. Three review rounds found this same over-read, each time in a different disguise.",
+  "",
+  "quote: Callan's own words, verbatim. If a field cannot be traced to a quote or to recorded",
+  "evidence, it is an inference - say so in `inference`, do not launder it into an axis."
+ ],
+ "_provenance": {
+  "source": "Callan Day (Solio reserve manager), WhatsApp 2026-07-14",
+  "asked_by": "James",
+  "context": "Reply to the 2026-07-09 road-data pack: 7 unconfirmed crossing sites of 22.",
+  "also_said": "Happy with the Solio Roads V2 File"
+ },
+ "sites": {
+  "S01": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": "near Tharua Bridge — separate crossing S of the drawn bridge",
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
   },
-  "sites": {
-    "S01": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": "near Tharua Bridge — separate crossing S of the drawn bridge",
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S02": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S03": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S04": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S05": {
-      "crossing_exists": "unknown",
-      "guest_routable": "unknown",
-      "routable_basis": null,
-      "closure": "open",
-      "name": "Kingfisher Dam",
-      "quote": [
-        "S05 = Dam",
-        "Yeah - you can drive to a sort of view point/ pick nic spot",
-        "I'd say the road is pretty accurate on the map",
-        "I believe it's an end point"
-      ],
-      "date": "2026-07-14",
-      "likely_endpoint": true,
-      "inference": [
-        "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
-        "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
-        "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
-        "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
-        "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
-        "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
-        "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
-        "exactly why this is `unconfirmed` and not `private`."
-      ]
-    },
-    "S06": {
-      "crossing_exists": true,
-      "guest_routable": "unknown",
-      "routable_basis": null,
-      "closure": "open",
-      "name": null,
-      "quote": [
-        "S06 = Crossing"
-      ],
-      "date": "2026-07-14",
-      "inference": [
-        "CROSSING EXISTS: quoted. 'Crossing' answers the topology question directly - unlike S16/S21,",
-        "which name the ROAD the join sits on and say nothing about the join itself.",
-        "GUEST ROUTABLE: UNKNOWN. Nobody has asked. CUT until someone does.",
-        "",
-        "The reasoning that kept it open for three review rounds: Callan flagged access restrictions",
-        "explicitly where he wanted them (S18/S20, unprompted), said nothing of the sort here, and",
-        "S06 is drawn on the guest poster - so the default should be that guests may use it. That is",
-        "a decent bet. It is not an answer, and D79 exists precisely to stop me routing on a decent",
-        "bet: 'Crossing' answers topology, not permission. Round 1 called it an over-read; round 2",
-        "called it an over-read; I answered round 2 by writing `routable_basis: inference` next to",
-        "`guest_routable: true` and calling it fixed. Labelling the guess did not stop the app acting",
-        "on the guess - the site stayed in the graph and the joins file still read 'guests may drive",
-        "it'. An inference is a reason to ask a better question, not a basis for routing (D90 F2).",
-        "",
-        "COST OF BLOCKING: 15/36 POI pairs, including all three Kingfisher recoveries",
-        "(rhinogate->kingfisher 9.36->10.95 km, kingfisher->yellowthorn 6.18->7.33,",
-        "kingfisher->naribo 7.58->9.18). Nothing becomes unreachable - every POI still routes, just",
-        "further; worst case +1.60 km. S06 is the ONLY site whose answer buys anything: S16 and S21",
-        "are worth exactly zero. That cost is why this is worth an ask, and is not a reason to assume",
-        "the answer. Nav is off, so today it costs nothing real.",
-        "",
-        "TO SETTLE: 'May guests drive through the crossing at S06?' One answer, one field.",
-        "Name NOT confirmed: our 'Browns Bridge' guess is dropped, he never said Browns."
-      ]
-    },
-    "S07": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S08": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S09": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S10": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": "Martins Bridge",
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S11": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S12": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S13": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S14": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S15": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S16": {
-      "crossing_exists": "unknown",
-      "guest_routable": "unknown",
-      "routable_basis": null,
-      "closure": "open",
-      "name": "Mount Kenya River Road (part)",
-      "quote": [
-        "S16 = Part of the Mount Kenya River Road"
-      ],
-      "date": "2026-07-14",
-      "inference": [
-        "Identifies a ROAD. Says nothing about whether the river join we inferred is a real,",
-        "guest-drivable crossing. Unblocked on 14 Jul in breach of our own rule; reblocked",
-        "2026-07-15 (D87 F1). Costs zero POI pairs, so there was never any reason to over-read it.",
-        "To promote: ask 'does the road actually cross the river here, and may guests drive through?'"
-      ]
-    },
-    "S17": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S18": {
-      "crossing_exists": true,
-      "guest_routable": false,
-      "routable_basis": null,
-      "closure": "settled",
-      "name": "Marriotts Private Road",
-      "quote": [
-        "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
-      ],
-      "date": "2026-07-14",
-      "agreed_by": "Callan proposed, James agreed, 2026-07-14",
-      "inference": [
-        "Crossing is real; access is the decision. Callan proposed the restriction himself, so this",
-        "is agreed on both sides, not a suggestion folded into scope.",
-        "SCOPE: the two CROSSINGS are cut, not 'the drive' - we have no geometry for the Marriotts",
-        "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
-        "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
-      ]
-    },
-    "S19": {
-      "crossing_exists": true,
-      "guest_routable": true,
-      "routable_basis": "recorded-drive",
-      "closure": "settled",
-      "name": null,
-      "quote": [],
-      "date": "2026-07-09",
-      "inference": [
-        "Proven by a recorded GPX drive crossing the river within 150 m of the join",
-        "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
-      ]
-    },
-    "S20": {
-      "crossing_exists": true,
-      "guest_routable": false,
-      "routable_basis": null,
-      "closure": "settled",
-      "name": "Marriotts Private Road",
-      "quote": [
-        "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
-      ],
-      "date": "2026-07-14",
-      "agreed_by": "Callan proposed, James agreed, 2026-07-14",
-      "inference": [
-        "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
-        "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
-      ]
-    },
-    "S21": {
-      "crossing_exists": "unknown",
-      "guest_routable": "unknown",
-      "routable_basis": null,
-      "closure": "open",
-      "name": "Orphanage Road",
-      "quote": [
-        "S21 = Orphanage Road - Looks good"
-      ],
-      "date": "2026-07-14",
-      "inference": [
-        "Identifies a ROAD. 'Looks good' is not topology approval of the inferred river join.",
-        "Same breach and same fix as S16 (D87 F1); reblocked 2026-07-15 at zero route cost.",
-        "Also killed our 'likely Waterbuck Bridge' guess - Waterbuck is now UNLOCATED."
-      ]
-    },
-    "S22": {
-      "crossing_exists": "unknown",
-      "guest_routable": "unknown",
-      "routable_basis": null,
-      "closure": "open",
-      "name": null,
-      "quote": [],
-      "date": null,
-      "inference": [
-        "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
-      ]
-    }
+  "S02": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
   },
-  "_inventory": [
-    "ALL 22 sites are listed. This is deliberate and load-bearing: a site that is merely",
-    "ABSENT from this file silently drops out of governance — nothing blocks it, nothing",
-    "checks it, and it stays routable. Round 2 proved it: deleting S06 from the manifest",
-    "left the whole suite green. Prose saying 'the rest are fine' is not an inventory (D89).",
-    "test_decision_consistency.py asserts every site in the joins file appears here."
-  ]
+  "S03": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S04": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S05": {
+   "crossing_exists": "unknown",
+   "guest_routable": "unknown",
+   "routable_basis": null,
+   "closure": "open",
+   "name": "Kingfisher Dam",
+   "quote": [
+    "S05 = Dam",
+    "Yeah - you can drive to a sort of view point/ pick nic spot",
+    "I'd say the road is pretty accurate on the map",
+    "I believe it's an end point"
+   ],
+   "date": "2026-07-14",
+   "likely_endpoint": true,
+   "inference": [
+    "'drive TO a viewpoint' + 'I believe it's an end point' reads as a destination, not a",
+    "through route - so we keep it cut. But 'I believe' is hedged, so this is NOT recorded as",
+    "settled fact (D87 F2 downgraded it from permanent/no-crossing back to unconfirmed).",
+    "RETRACTED: 'opening S05 costs zero routes' was never established. The experiment's extra",
+    "node-pair lands in a component that gets pruned, so the identical SHA proved nothing; a",
+    "plausible real connection moves 8/36 POI pairs. Do not repeat that claim.",
+    "If a real crossing is ever confirmed here, unblocking is the CORRECT response - which is",
+    "exactly why this is `unconfirmed` and not `private`."
+   ]
+  },
+  "S06": {
+   "crossing_exists": false,
+   "guest_routable": false,
+   "routable_basis": null,
+   "closure": "settled",
+   "name": null,
+   "quote": [
+    "S06 = Crossing",
+    "Yes that is passable, was that in question?",
+    "Yeah they are seasonal streams",
+    "S06 is not a passable position for the river, its just a label for the toilet, it is not a passable point to cross the river"
+   ],
+   "date": "2026-07-23",
+   "inference": [
+    "NOT A CROSSING - SETTLED (James, 2026-07-23). The map mark at the S06 site is the",
+    "poster's TOILET symbol (orange dot per Jen's legend), not a river crossing. There is",
+    "no passable point to cross the river here. Cut is permanent.",
+    "",
+    "How the earlier quotes got misread: 'S06 = Crossing' (2026-07-14) and 'Yes that is",
+    "passable' (2026-07-22, green-circle image) were both answers about a mark that turns",
+    "out to be the toilet label - 'passable' meaning you can drive UP to it, not across",
+    "the river. The 2026-07-23 'seasonal streams' reply reframed the circled marks, and",
+    "checking Jen's legend (orange = TOILET) settled it. Three review rounds said the",
+    "'crossing' reading was an over-read; they were right for a better reason than anyone",
+    "knew.",
+    "",
+    "COST, NOW PERMANENT: the 15/36 POI-pair detours (all three Kingfisher recoveries,",
+    "worst case +1.60 km) are the true road network, not a pending recovery. Nothing is",
+    "unreachable. The planned guest-permission ask is CANCELLED - there is nothing to ask",
+    "permission about.",
+    "",
+    "TOILET POI: this site is a located toilet - feeds the toilet-POI patch (D102/D104",
+    "carried item) instead of any unblock."
+   ]
+  },
+  "S07": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S08": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S09": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S10": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": "Martins Bridge",
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S11": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S12": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S13": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S14": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S15": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S16": {
+   "crossing_exists": "unknown",
+   "guest_routable": "unknown",
+   "routable_basis": null,
+   "closure": "open",
+   "name": "Mount Kenya River Road (part)",
+   "quote": [
+    "S16 = Part of the Mount Kenya River Road"
+   ],
+   "date": "2026-07-14",
+   "inference": [
+    "Identifies a ROAD. Says nothing about whether the river join we inferred is a real,",
+    "guest-drivable crossing. Unblocked on 14 Jul in breach of our own rule; reblocked",
+    "2026-07-15 (D87 F1). Costs zero POI pairs, so there was never any reason to over-read it.",
+    "To promote: ask 'does the road actually cross the river here, and may guests drive through?'"
+   ]
+  },
+  "S17": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S18": {
+   "crossing_exists": true,
+   "guest_routable": false,
+   "routable_basis": null,
+   "closure": "settled",
+   "name": "Marriotts Private Road",
+   "quote": [
+    "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+   ],
+   "date": "2026-07-14",
+   "agreed_by": "Callan proposed, James agreed, 2026-07-14",
+   "inference": [
+    "Crossing is real; access is the decision. Callan proposed the restriction himself, so this",
+    "is agreed on both sides, not a suggestion folded into scope.",
+    "SCOPE: the two CROSSINGS are cut, not 'the drive' - we have no geometry for the Marriotts",
+    "road as a whole. Cutting them leaves it as three dead-end spurs, so through-driving is",
+    "structurally impossible. JW Marriott stays reachable: it is a lodge guests sleep in."
+   ]
+  },
+  "S19": {
+   "crossing_exists": true,
+   "guest_routable": true,
+   "routable_basis": "recorded-drive",
+   "closure": "settled",
+   "name": null,
+   "quote": [],
+   "date": "2026-07-09",
+   "inference": [
+    "Proven by a recorded GPX drive crossing the river within 150 m of the join",
+    "(2026-07-09 regrade). Evidence, not words — never part of the Callan ask."
+   ]
+  },
+  "S20": {
+   "crossing_exists": true,
+   "guest_routable": false,
+   "routable_basis": null,
+   "closure": "settled",
+   "name": "Marriotts Private Road",
+   "quote": [
+    "S20 & S18 = Marriotts Private Road - May be a good idea to restrict access here"
+   ],
+   "date": "2026-07-14",
+   "agreed_by": "Callan proposed, James agreed, 2026-07-14",
+   "inference": [
+    "See S18. This is the crossing W of JW Marriott; the parked jw-bridge connector in",
+    "connectors.unconfirmed.geojson belongs here and must NOT be re-added for guest routing."
+   ]
+  },
+  "S21": {
+   "crossing_exists": "unknown",
+   "guest_routable": "unknown",
+   "routable_basis": null,
+   "closure": "open",
+   "name": "Orphanage Road",
+   "quote": [
+    "S21 = Orphanage Road - Looks good"
+   ],
+   "date": "2026-07-14",
+   "inference": [
+    "Identifies a ROAD. 'Looks good' is not topology approval of the inferred river join.",
+    "Same breach and same fix as S16 (D87 F1); reblocked 2026-07-15 at zero route cost.",
+    "Also killed our 'likely Waterbuck Bridge' guess - Waterbuck is now UNLOCATED."
+   ]
+  },
+  "S22": {
+   "crossing_exists": "unknown",
+   "guest_routable": "unknown",
+   "routable_basis": null,
+   "closure": "open",
+   "name": null,
+   "quote": [],
+   "date": null,
+   "inference": [
+    "Never answered. The orphanage corner, outside GPX coverage. Parked - not worth an ask."
+   ]
+  }
+ },
+ "_inventory": [
+  "ALL 22 sites are listed. This is deliberate and load-bearing: a site that is merely",
+  "ABSENT from this file silently drops out of governance — nothing blocks it, nothing",
+  "checks it, and it stays routable. Round 2 proved it: deleting S06 from the manifest",
+  "left the whole suite green. Prose saying 'the rest are fine' is not an inventory (D89).",
+  "test_decision_consistency.py asserts every site in the joins file appears here."
+ ]
 }

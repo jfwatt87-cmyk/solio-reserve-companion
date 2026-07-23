@@ -1,7 +1,7 @@
 {
  "type": "FeatureCollection",
  "name": "Solio_Blocked_Crossings_V2",
- "description": "River crossings the app will NOT route over, and why. Each carries two SEPARATE facts: crossing_exists (is there a crossing here?) and guest_routable (may a guest drive through it?). Either can be \"unknown\", and unknown is why most of these are cut. reason=crossing-unconfirmed \u2014 we have not established there is a real, drivable crossing here; naming the road is not the same as confirming you can drive through it. reason=permission-unknown \u2014 the crossing IS real, but nobody has asked whether guests may use it, so the app does not assume they may. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, and closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. The first two reopen the moment Solio answers; the third does not. A crossing NOT listed here is not blocked by this decision layer \u2014 which is NOT the same as asserting its geometry is present and routable in the network. Generated from crossing_decisions.json.",
+ "description": "River crossings the app will NOT route over, and why. Each carries two SEPARATE facts: crossing_exists (is there a crossing here?) and guest_routable (may a guest drive through it?). Either can be \"unknown\", and unknown is why most of these are cut. reason=crossing-unconfirmed \u2014 we have not established there is a real, drivable crossing here; naming the road is not the same as confirming you can drive through it. reason=permission-unknown \u2014 the crossing IS real, but nobody has asked whether guests may use it, so the app does not assume they may. reason=private-access \u2014 the Marriotts private crossings (S18/S20): real, and closed to guest through-routing at Solio's request. JW Marriott itself remains reachable. reason=not-a-crossing \u2014 established there is no crossing here at all (S06: the map mark is a toilet label, not a river crossing). The first two reopen the moment Solio answers; the others do not. A crossing NOT listed here is not blocked by this decision layer \u2014 which is NOT the same as asserting its geometry is present and routable in the network. Generated from crossing_decisions.json.",
  "crs": {
   "type": "name",
   "properties": {
@@ -9,35 +9,6 @@
   }
  },
  "features": [
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "LineString",
-    "coordinates": [
-     [
-      36.937133,
-      -0.158494
-     ],
-     [
-      36.936745,
-      -0.15846
-     ]
-    ]
-   },
-   "properties": {
-    "site": "S06",
-    "site_name": null,
-    "crossing_exists": true,
-    "guest_routable": "unknown",
-    "reason": "permission-unknown",
-    "routed_by_app": false,
-    "gap_m": 43.3,
-    "solio_said": [
-     "S06 = Crossing"
-    ],
-    "decided": "2026-07-14"
-   }
-  },
   {
    "type": "Feature",
    "geometry": {
@@ -335,6 +306,38 @@
      "I believe it's an end point"
     ],
     "decided": "2026-07-14"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      36.937133,
+      -0.158494
+     ],
+     [
+      36.936745,
+      -0.15846
+     ]
+    ]
+   },
+   "properties": {
+    "site": "S06",
+    "site_name": null,
+    "crossing_exists": false,
+    "guest_routable": false,
+    "reason": "not-a-crossing",
+    "routed_by_app": false,
+    "gap_m": 43.3,
+    "solio_said": [
+     "S06 = Crossing",
+     "Yes that is passable, was that in question?",
+     "Yeah they are seasonal streams",
+     "S06 is not a passable position for the river, its just a label for the toilet, it is not a passable point to cross the river"
+    ],
+    "decided": "2026-07-23"
    }
   },
   {
