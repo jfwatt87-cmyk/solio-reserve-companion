@@ -54,6 +54,7 @@ const POI_COLOR: Record<string, string> = {
   viewpoint: "#3d7a5a",
   waterhole: "#4f8aa0",
   picnic: "#7a6a3d",
+  toilet: "#5f6b73",
 };
 
 const POI_GLYPH: Record<string, string> = {
@@ -64,6 +65,7 @@ const POI_GLYPH: Record<string, string> = {
   viewpoint: "◬",
   waterhole: "≈",
   picnic: "⛺",
+  toilet: "🚻",
 };
 
 // The georeferenced "true-north" poster (Callan's straightened illustration with the

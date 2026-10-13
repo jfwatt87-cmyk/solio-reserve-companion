@@ -376,6 +376,8 @@ const RAW_NODES: RawNode[] = [
   { id: "orphanage", pixel: { x: 773.2, y: 2491.6 } },
   { id: "kingfisher", pixel: { x: 958.4, y: 1047.5 } },
   { id: "yellowthorn", pixel: { x: 1584.0, y: 1247.6 } },
+  { id: "toilet-middlebridge", pixel: { x: 1307.2, y: 1556.1 } },
+  { id: "toilet-cheetahplain", pixel: { x: 829.1, y: 1760.4 } },
 ];
 
 interface RawEdge {
@@ -873,10 +875,10 @@ const RAW_EDGES: RawEdge[] = [
   },
   {
     a: "g3",
-    b: "g102",
+    b: "toilet-middlebridge",
     name: "",
     type: "dirt",
-    via: [{ x: 1308.0, y: 1547.0 }, { x: 1307.2, y: 1556.1 }, { x: 1301.9, y: 1564.8 }],
+    via: [{ x: 1308.0, y: 1547.0 }],
   },
   {
     a: "g148",
@@ -2266,10 +2268,10 @@ const RAW_EDGES: RawEdge[] = [
   },
   {
     a: "g41",
-    b: "g218",
+    b: "toilet-cheetahplain",
     name: "",
     type: "dirt",
-    via: [{ x: 791.2, y: 1775.6 }, { x: 795.6, y: 1772.0 }, { x: 799.3, y: 1770.3 }, { x: 817.9, y: 1767.9 }, { x: 822.9, y: 1762.2 }, { x: 837.5, y: 1758.0 }, { x: 840.7, y: 1756.2 }],
+    via: [{ x: 791.2, y: 1775.6 }, { x: 795.6, y: 1772.0 }, { x: 799.3, y: 1770.3 }, { x: 817.9, y: 1767.9 }, { x: 822.9, y: 1762.2 }],
   },
   {
     a: "g103",
@@ -3537,6 +3539,20 @@ const RAW_EDGES: RawEdge[] = [
     name: "",
     type: "dirt",
     via: [{ x: 1592.7, y: 1256.9 }, { x: 1599.4, y: 1256.5 }, { x: 1602.1, y: 1253.7 }, { x: 1608.9, y: 1252.3 }, { x: 1612.3, y: 1254.7 }, { x: 1616.7, y: 1262.7 }, { x: 1633.7, y: 1272.5 }, { x: 1647.0, y: 1291.1 }],
+  },
+  {
+    a: "toilet-middlebridge",
+    b: "g102",
+    name: "",
+    type: "dirt",
+    via: [{ x: 1301.9, y: 1564.8 }],
+  },
+  {
+    a: "toilet-cheetahplain",
+    b: "g218",
+    name: "",
+    type: "dirt",
+    via: [{ x: 837.5, y: 1758.0 }, { x: 840.7, y: 1756.2 }],
   },
 ];
 

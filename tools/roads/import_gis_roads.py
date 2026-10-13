@@ -787,7 +787,16 @@ def main() -> None:
     )
     edge_blocks = []
     for e in edges:
-        via = ", ".join(px(p) for p in e["pts"][1:-1])
+        # A POI split that lands on an existing vertex keeps that vertex beside the
+        # new node, which rounds to a zero-length segment — drop repeats as emitted.
+        pts = [px(p) for p in e["pts"]]
+        kept = [pts[0]]
+        for p in pts[1:-1]:
+            if p != kept[-1]:
+                kept.append(p)
+        if len(kept) > 1 and kept[-1] == pts[-1]:
+            kept.pop()
+        via = ", ".join(kept[1:])
         edge_blocks.append(
             "  {\n"
             f'    a: "{ids[e["a"]]}",\n'

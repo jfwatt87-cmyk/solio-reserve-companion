@@ -14,7 +14,8 @@ export type PoiKind =
   | "airstrip"
   | "viewpoint"
   | "waterhole"
-  | "picnic";
+  | "picnic"
+  | "toilet";
 
 export interface Poi {
   id: string;
@@ -106,6 +107,25 @@ export const POIS: Poi[] = [
     pixel: { x: 1601, y: 1610 },
     nodeId: "choroa",
     blurb: "Central dam.",
+  },
+  // Both toilets are read off Jen's revised artwork via warp+merc2px and proven on
+  // the live app (D102): Middle Bridge -0.183317, 36.933423; Cheetah Plain
+  // -0.196254, 36.902462. Pixels are the exact inverse of the corner georeference.
+  {
+    id: "toilet-middlebridge",
+    name: "Toilet · Middle Bridge",
+    kind: "toilet",
+    pixel: { x: 1318.3, y: 1560.9 },
+    nodeId: "toilet-middlebridge",
+    blurb: "Toilet stop beside Middle Bridge.",
+  },
+  {
+    id: "toilet-cheetahplain",
+    name: "Toilet · Cheetah Plain",
+    kind: "toilet",
+    pixel: { x: 833.4, y: 1777.4 },
+    nodeId: "toilet-cheetahplain",
+    blurb: "Toilet stop on the west side of Cheetah Plain.",
   },
 ];
 
