@@ -58,7 +58,7 @@ def main() -> None:
         via = [(float(x), float(y)) for x, y in re.findall(r"\{ x: ([\d.]+), y: ([\d.]+) \}", m.group(3))]
         edges.append((m.group(1), m.group(2), via))
 
-    # 1. POI binding: 9/10, only the airstrip may be unbound
+    # 1. POI binding: every POI binds except the airstrip (no road within reach)
     pois = poi_ids()
     missing = [p for p in pois if p not in nodes]
     check("POI binding", missing == ["airstrip"], f"{len(pois)-len(missing)}/{len(pois)} bound, missing={missing}")

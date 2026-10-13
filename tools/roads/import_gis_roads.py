@@ -126,8 +126,14 @@ def bind_pois_to_edges(
             target = len(nodes)
             nodes.append(proj)
             pts = e["pts"]
-            left = pts[: k + 1] + [proj]
-            right = [proj] + pts[k + 1 :]
+            # A projection that lands on an interior vertex must not keep that vertex
+            # beside the new node — that is a zero-length segment.
+            left = pts[: k + 1]
+            if dist_m(left[-1], proj) > 0.01:
+                left = left + [proj]
+            right = pts[k + 1 :]
+            if dist_m(right[0], proj) > 0.01:
+                right = [proj] + right
             edges[ei] = {"a": na, "b": target, "name": e["name"], "surface": e["surface"], "pts": left}
             edges.append({"a": target, "b": nb, "name": e["name"], "surface": e["surface"], "pts": right})
         claimed[target] = poi_id
@@ -787,16 +793,7 @@ def main() -> None:
     )
     edge_blocks = []
     for e in edges:
-        # A POI split that lands on an existing vertex keeps that vertex beside the
-        # new node, which rounds to a zero-length segment — drop repeats as emitted.
-        pts = [px(p) for p in e["pts"]]
-        kept = [pts[0]]
-        for p in pts[1:-1]:
-            if p != kept[-1]:
-                kept.append(p)
-        if len(kept) > 1 and kept[-1] == pts[-1]:
-            kept.pop()
-        via = ", ".join(kept[1:])
+        via = ", ".join(px(p) for p in e["pts"][1:-1])
         edge_blocks.append(
             "  {\n"
             f'    a: "{ids[e["a"]]}",\n'

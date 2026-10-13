@@ -109,8 +109,7 @@ export const POIS: Poi[] = [
     blurb: "Central dam.",
   },
   // Both toilets are read off Jen's revised artwork via warp+merc2px and proven on
-  // the live app (D102): Middle Bridge -0.183317, 36.933423; Cheetah Plain
-  // -0.196254, 36.902462. Pixels are the exact inverse of the corner georeference.
+  // the live app (D102, artwork-v2-qa/poi-proof-pack).
   {
     id: "toilet-middlebridge",
     name: "Toilet · Middle Bridge",
