@@ -23,7 +23,7 @@ import {
   originFailureMessage,
   type Fix,
 } from "./lib/navOrigin";
-import { pathLength, poseAlong } from "./lib/sim";
+import { atPathEnd, pathLength, poseAlong } from "./lib/sim";
 import { precacheTiles, tilesAlreadyCached, verifyTilesCached, invalidateTileCache, requestPersistentStorage } from "./lib/precache";
 import { navAuthCached, refreshNavAuth } from "./lib/navAuth";
 import { detectInApp, type InAppInfo } from "./lib/inapp";
@@ -503,8 +503,13 @@ export default function App() {
   }, [source, playing, speedMult, simPath]);
 
   // Arrival handling — fires once when the destination is reached. In sim that's
-  // the end of the driven path; on real GPS it's coming within ARRIVE_M of the POI.
-  const ARRIVE_M = 45; // POIs can sit just off the road, so allow a small radius
+  // the end of the driven path; on real GPS it's coming within ARRIVE_M of the POI,
+  // or reaching the END of the route. The route ends at the POI's road node, which
+  // sits 67–282 m off the POI itself (pois bind to the nearest road), so a POI
+  // radius alone never fires for most destinations. Route-end arrival needs the
+  // fix both near the end node AND projected onto the final ARRIVE_M of the path,
+  // so passing close to the end node mid-route (a parallel road) doesn't count.
+  const ARRIVE_M = 45;
   useEffect(() => {
     if (!drivingNav.current || !activeRoute || detouring.current) return;
     const dest = POIS.find((p) => p.id === destPoiId);
@@ -516,7 +521,8 @@ export default function App() {
     const arrived =
       source === "sim"
         ? simPath.length >= 2 && simDist >= pathLength(simPath)
-        : !!(gpsPos && dest && distanceMeters(gpsPos, poiWorld(dest)) < ARRIVE_M);
+        : !!(gpsPos && dest && (distanceMeters(gpsPos, poiWorld(dest)) < ARRIVE_M
+            || atPathEnd(gpsPos, activeRoute.path, ARRIVE_M)));
     if (!arrived) return;
     drivingNav.current = false;
     setDriving(false);

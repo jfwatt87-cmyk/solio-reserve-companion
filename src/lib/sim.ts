@@ -5,7 +5,7 @@
  * tell the difference.
  */
 
-import { bearingDeg, distanceMeters, type LatLng } from "./geo";
+import { bearingDeg, distanceMeters, projectOnPath, type LatLng } from "./geo";
 
 export interface Pose {
   pos: LatLng;
@@ -17,6 +17,19 @@ export function pathLength(path: LatLng[]): number {
   let total = 0;
   for (let i = 1; i < path.length; i++) total += distanceMeters(path[i - 1], path[i]);
   return total;
+}
+
+/**
+ * Whether `pos` has reached the END of `path`: within `radiusM` of the final
+ * point AND projected onto the last `radiusM` of the line, so passing close to
+ * the end point earlier in the route (a parallel road) doesn't count.
+ */
+export function atPathEnd(pos: LatLng, path: LatLng[], radiusM: number): boolean {
+  return (
+    path.length >= 2 &&
+    distanceMeters(pos, path[path.length - 1]) < radiusM &&
+    projectOnPath(pos, path).along >= pathLength(path) - radiusM
+  );
 }
 
 /** Interpolate a pose at `distM` metres along `path` (clamped to its ends). */
