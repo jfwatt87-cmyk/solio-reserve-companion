@@ -5,7 +5,7 @@
  * tell the difference.
  */
 
-import { bearingDeg, distanceMeters, projectOnPath, type LatLng } from "./geo";
+import { bearingDeg, distanceMeters, type LatLng } from "./geo";
 
 export interface Pose {
   pos: LatLng;
@@ -19,16 +19,22 @@ export function pathLength(path: LatLng[]): number {
   return total;
 }
 
+/** Arrival radius (m) on real GPS — around the POI, and around the route's end. */
+export const ARRIVE_M = 45;
+
 /**
  * Whether `pos` has reached the END of `path`: within `radiusM` of the final
- * point AND projected onto the last `radiusM` of the line, so passing close to
- * the end point earlier in the route (a parallel road) doesn't count.
+ * point AND with route progress `alongM` inside the last `radiusM` of the line.
+ * `alongM` must be monotone progress (projectOnPathFrom), not a global
+ * projection: on a route that passes its own end on the way out to a stop and
+ * back, the global nearest segment can be the return leg, and arrival would
+ * fire on the outbound pass.
  */
-export function atPathEnd(pos: LatLng, path: LatLng[], radiusM: number): boolean {
+export function atPathEnd(pos: LatLng, path: LatLng[], alongM: number, radiusM: number): boolean {
   return (
     path.length >= 2 &&
     distanceMeters(pos, path[path.length - 1]) < radiusM &&
-    projectOnPath(pos, path).along >= pathLength(path) - radiusM
+    alongM >= pathLength(path) - radiusM
   );
 }
 

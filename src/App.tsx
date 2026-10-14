@@ -10,7 +10,7 @@ import {
   distanceMeters,
   destinationPoint,
   pointToPathMeters,
-  projectOnPath,
+  projectOnPathFrom,
   formatDistance,
   type LatLng,
 } from "./lib/geo";
@@ -23,7 +23,7 @@ import {
   originFailureMessage,
   type Fix,
 } from "./lib/navOrigin";
-import { atPathEnd, pathLength, poseAlong } from "./lib/sim";
+import { ARRIVE_M, atPathEnd, pathLength, poseAlong } from "./lib/sim";
 import { precacheTiles, tilesAlreadyCached, verifyTilesCached, invalidateTileCache, requestPersistentStorage } from "./lib/precache";
 import { navAuthCached, refreshNavAuth } from "./lib/navAuth";
 import { detectInApp, type InAppInfo } from "./lib/inapp";
@@ -507,9 +507,10 @@ export default function App() {
   // or reaching the END of the route. The route ends at the POI's road node, which
   // sits 67–282 m off the POI itself (pois bind to the nearest road), so a POI
   // radius alone never fires for most destinations. Route-end arrival needs the
-  // fix both near the end node AND projected onto the final ARRIVE_M of the path,
-  // so passing close to the end node mid-route (a parallel road) doesn't count.
-  const ARRIVE_M = 45;
+  // fix both near the end node AND progress inside the final ARRIVE_M of the path.
+  // Progress is anchored to the last known value (projectOnPathFrom), so a route
+  // that passes its own end on the way out to a stop and back can't "arrive" on
+  // the outbound pass (Fable review, MAJOR 1).
   useEffect(() => {
     if (!drivingNav.current || !activeRoute || detouring.current) return;
     const dest = POIS.find((p) => p.id === destPoiId);
@@ -522,7 +523,8 @@ export default function App() {
       source === "sim"
         ? simPath.length >= 2 && simDist >= pathLength(simPath)
         : !!(gpsPos && dest && (distanceMeters(gpsPos, poiWorld(dest)) < ARRIVE_M
-            || atPathEnd(gpsPos, activeRoute.path, ARRIVE_M)));
+            || atPathEnd(gpsPos, activeRoute.path,
+              projectOnPathFrom(gpsPos, activeRoute.path, simDist).along, ARRIVE_M)));
     if (!arrived) return;
     drivingNav.current = false;
     setDriving(false);
@@ -562,7 +564,8 @@ export default function App() {
     if (source !== "gps" || !driving || !activeRoute || !user) return;
     const pos = goodGpsPos();
     if (!pos) return;
-    setSimDist(projectOnPath(pos, activeRoute.path).along);
+    // Anchored to the previous progress — see projectOnPathFrom.
+    setSimDist((prev) => projectOnPathFrom(pos, activeRoute.path, prev).along);
   }, [source, driving, activeRoute, user]);
 
   // ---- Live re-routing -----------------------------------------------------
@@ -573,6 +576,10 @@ export default function App() {
   const REROUTE_M = 60;
   useEffect(() => {
     if (!driving || !destPoiId || !activeRoute || !user) return;
+    // Arrival (the effect above) runs first in the same commit and clears the
+    // ref synchronously; without this, a POI-radius arrival >REROUTE_M off the
+    // road (Choroa, 282 m) re-routes from this stale closure and undoes it.
+    if (!drivingNav.current) return;
     if (pointToPathMeters(user, activeRoute.path) <= REROUTE_M) return;
     if (Date.now() - lastReroute.current < 2500) return;
     const dest = POIS.find((p) => p.id === destPoiId);
@@ -980,7 +987,7 @@ export default function App() {
     setStops(next);
     setActiveRoute(r);
     setSimPath(r.path);
-    setSimDist(source === "gps" ? projectOnPath(rf.pos, r.path).along : 0);
+    setSimDist(source === "gps" ? projectOnPathFrom(rf.pos, r.path, 0).along : 0);
     if (source === "sim") setPlaying(true);
     return true;
   }
@@ -1030,6 +1037,13 @@ export default function App() {
       setDestPoiId(null);
       return;
     }
+    // A route shorter than the arrival radius would "arrive" on the first fix
+    // and tear straight down — say so instead of starting a drive.
+    if (destPoi && pathLength(r.path) < ARRIVE_M) {
+      setToast(`You're already at ${destPoi.name}`);
+      setDestPoiId(null);
+      return;
+    }
     drivingNav.current = true;
     setDriving(true);
     setActiveRoute(r);
@@ -1043,7 +1057,7 @@ export default function App() {
       // begins at the guest's last gated snap — and the gated progress effect
       // takes over on the next good fix (banner shows "guidance paused" until).
       const pos = goodGpsPos();
-      setSimDist(pos ? projectOnPath(pos, r.path).along : 0);
+      setSimDist(pos ? projectOnPathFrom(pos, r.path, 0).along : 0);
     } else {
       setSimDist(0);
       setPlaying(true);
@@ -1083,6 +1097,11 @@ export default function App() {
       return;
     }
     const r = res.ok ? network.routeFrom(res.snap, poi.nodeId) : null;
+    if (r && r.path.length >= 2 && pathLength(r.path) < ARRIVE_M) {
+      // Already at this stop (route shorter than the arrival radius).
+      setTourAtStop(true);
+      return;
+    }
     if (!r || r.path.length < 2) {
       if (distanceMeters(rf.pos, poiWorld(poi)) > 250) {
         // Unroutable stop (POI not bound to a road) — say so, don't fake arrival.
@@ -1105,7 +1124,7 @@ export default function App() {
     // stays sim (demo behaviour unchanged); GPS guests get live guidance,
     // progress and re-routing exactly like a normal drive.
     if (source === "gps") {
-      setSimDist(projectOnPath(rf.pos, r.path).along);
+      setSimDist(projectOnPathFrom(rf.pos, r.path, 0).along);
     } else {
       setSimDist(0);
       setPlaying(true);

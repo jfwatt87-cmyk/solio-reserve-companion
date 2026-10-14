@@ -27,6 +27,11 @@ fi
 echo "deploy:prod: road-network safety tests…"
 npm run test:roads
 
+# Route progress + arrival on the shipped network (2026-10-14): arrival is a
+# terminal action (tears down the drive), so it is gated the same way.
+echo "deploy:prod: navigation progress + arrival tests…"
+npm run test:nav
+
 echo "deploy:prod: building clean main ($(git rev-parse --short HEAD))…"
 npm run build
 

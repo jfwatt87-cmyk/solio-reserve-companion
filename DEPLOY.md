@@ -31,8 +31,9 @@ Cloudflare, and force-pushed verbatim to the `gh-pages` branch for the mirror.
    until both verify (never tag a split release). Then load the site and
    confirm the change is visible. Custom-domain propagation can lag a few
    minutes behind pages.dev.
-   `npm run test:roads` runs unconditionally inside `deploy:prod` (and must
-   still pass locally before committing a regenerated roads.gis.ts).
+   `npm run test:roads` and `npm run test:nav` run unconditionally inside
+   `deploy:prod` (and must still pass locally before committing a regenerated
+   roads.gis.ts or any change to routing/geo/sim).
 5. **Tag every release**: `git tag release-YYYYMMDD-<shortsha> && git push --tags`.
    Tags are the rollback anchors.
 6. **Never hand-edit or branch off `gh-pages`.** It is a machine-written

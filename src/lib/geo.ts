@@ -95,6 +95,50 @@ export function projectOnPath(p: LatLng, path: LatLng[]): { along: number; cross
   return { along: bestAlong, cross: best };
 }
 
+/**
+ * projectOnPath, but anchored to known progress. A route can drive the same road
+ * twice (out to a stop beyond the destination and back, or up a dead-end spur
+ * and down again), and there the globally nearest segment is a coin-flip
+ * between the two copies. Instead each segment's projection is scored as its
+ * cross-track distance plus a cost for the progress change it implies: cheap
+ * forward (`aheadPerM`), dearer backward (`backPerM`). So the outbound copy wins
+ * on the way out (the return copy is far ahead), the return copy wins once the
+ * guest has turned (the outbound copy is now behind), and a guest who has
+ * genuinely reversed still regresses (going back is cheaper than the off-road
+ * distance to anything ahead).
+ */
+export function projectOnPathFrom(
+  p: LatLng,
+  path: LatLng[],
+  fromAlong: number,
+  { aheadPerM = 0.05, backPerM = 0.5 } = {},
+): { along: number; cross: number } {
+  if (path.length < 2) return projectOnPath(p, path);
+  const mPerLat = 111_320;
+  const mPerLng = 111_320 * Math.cos(toRad(p.lat));
+  let best = { along: 0, cross: Infinity };
+  let bestCost = Infinity;
+  let acc = 0;
+  for (let i = 1; i < path.length; i++) {
+    const ax = (path[i - 1].lng - p.lng) * mPerLng;
+    const ay = (path[i - 1].lat - p.lat) * mPerLat;
+    const dx = (path[i].lng - p.lng) * mPerLng - ax;
+    const dy = (path[i].lat - p.lat) * mPerLat - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, (-ax * dx - ay * dy) / len2)) : 0;
+    // `along` in distanceMeters' metric so it compares exactly with
+    // pathLength() (the local flat projection runs ~0.1% long: ~20 m on 19 km).
+    const segLen = distanceMeters(path[i - 1], path[i]);
+    const along = acc + t * segLen;
+    const cross = Math.hypot(ax + t * dx, ay + t * dy);
+    const delta = along - fromAlong;
+    const cost = cross + (delta >= 0 ? aheadPerM * delta : -backPerM * delta);
+    if (cost < bestCost) { bestCost = cost; best = { along, cross }; }
+    acc += segLen;
+  }
+  return best;
+}
+
 /** Shortest distance (m) from a point to a polyline — the cross-track deviation. */
 export function pointToPathMeters(p: LatLng, path: LatLng[]): number {
   return projectOnPath(p, path).cross;
