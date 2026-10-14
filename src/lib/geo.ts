@@ -213,15 +213,3 @@ export function segmentsMinMeters(a1: LatLng, a2: LatLng, b1: LatLng, b2: LatLng
     ),
   );
 }
-
-/** "3 minutes ago" style relative time from an epoch (ms). */
-export function timeAgo(epochMs: number, now = Date.now()): string {
-  const s = Math.max(0, Math.round((now - epochMs) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h} hr${h > 1 ? "s" : ""} ago`;
-  const d = Math.round(h / 24);
-  return `${d} day${d > 1 ? "s" : ""} ago`;
-}
