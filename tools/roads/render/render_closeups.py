@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 import json, math
 from collections import defaultdict
 
-ROOT = "/Users/jameswattwork/Work Docs 2026/Personal/Solio map app"
+ROOT = "/Users/Shared/Mettux/clients/solio"
 POC = f"{ROOT}/solio-poc"
 OUT = f"{ROOT}/Callan Pack - Road Data 2026-07-09/5-crossings-closeup.png"
 Image.MAX_IMAGE_PIXELS = None
